@@ -1,0 +1,389 @@
+import { GAME_CONFIG, PHASES, PHASE_LABELS } from "./data/constants.js";
+import { getTemporaryBonus } from "./game/abilityLogic.js";
+import { BattleEngine } from "./game/battleEngine.js";
+import { createInitialGameState } from "./game/gameState.js";
+
+const app = document.querySelector("#app");
+const timers = new Set();
+const DIE_FACES = ["", "⚀", "⚁", "⚂", "⚃", "⚄", "⚅"];
+
+let engine = new BattleEngine(createInitialGameState());
+
+function schedule(callback, delay) {
+  const timer = window.setTimeout(() => {
+    timers.delete(timer);
+    callback();
+  }, delay);
+  timers.add(timer);
+}
+
+function clearTimers() {
+  timers.forEach((timer) => window.clearTimeout(timer));
+  timers.clear();
+}
+
+function hpPercent(current, max) {
+  return Math.max(0, Math.min(100, (current / max) * 100));
+}
+
+function multiplierLabel(value) {
+  return Number.isInteger(value) ? `×${value}` : `×${value.toFixed(1)}`;
+}
+
+function abilityLabel(card) {
+  if (card.onUseAbility?.type === "NEXT_TURN_ATTACK_BONUS") {
+    return `<span class="ability ability--boost"><i>↗</i> NEXT TURN ATK +${card.onUseAbility.value}</span>`;
+  }
+  if (card.passiveAbility?.type === "RIGHT_CARD_ATTACK_BONUS") {
+    return `<span class="ability ability--support"><i>→</i> RIGHT CARD ATK +${card.passiveAbility.value}</span>`;
+  }
+  return `<span class="ability ability--none">NO ABILITY</span>`;
+}
+
+function statusPanel(entity, label, modifier = "") {
+  const percent = hpPercent(entity.hp, entity.maxHp);
+  return `
+    <section class="fighter-status fighter-status--${modifier}">
+      <div class="fighter-status__heading">
+        <div>
+          <span class="eyebrow">${modifier === "cpu" ? "HOSTILE UNIT" : "ACTIVE PLAYER"}</span>
+          <h2>${label}</h2>
+        </div>
+        <span class="hp-readout"><b>${entity.hp}</b><small> / ${entity.maxHp}</small></span>
+      </div>
+      <div class="hp-track" role="progressbar" aria-label="${label} HP" aria-valuemin="0" aria-valuemax="${entity.maxHp}" aria-valuenow="${entity.hp}">
+        <div class="hp-track__fill" style="--hp:${percent}%"></div>
+        <div class="hp-track__shine"></div>
+      </div>
+    </section>
+  `;
+}
+
+function getCenterDisplay(state) {
+  if (state.phase === PHASES.PLAYER_ATTACK || state.phase === PHASES.VICTORY) {
+    const attack = state.lastAttack;
+    if (!attack) {
+      return {
+        kicker: "NO CARD PLAYED",
+        multiplier: "",
+        value: "—",
+        unit: "TURN END",
+        className: "",
+      };
+    }
+    return {
+      kicker: attack?.roleName || "DIRECT HIT",
+      multiplier: attack?.roleName ? multiplierLabel(attack.roleMultiplier) : "",
+      value: attack ? `${attack.finalAttack}` : "0",
+      unit: "DAMAGE",
+      className: "combat-readout--player-hit",
+    };
+  }
+
+  if (state.phase === PHASES.CPU_ATTACK || state.phase === PHASES.DEFEAT) {
+    return {
+      kicker: "ENEMY STRIKE",
+      multiplier: "",
+      value: `${GAME_CONFIG.CPU_ATTACK_DAMAGE}`,
+      unit: "DAMAGE TAKEN",
+      className: "combat-readout--enemy-hit",
+    };
+  }
+
+  const role = state.currentRole;
+  return {
+    kicker: role?.roleName || "NO ACTIVE ROLE",
+    multiplier: role?.roleName ? multiplierLabel(role.multiplier) : "×1",
+    value: state.turn.toString().padStart(2, "0"),
+    unit: "TURN",
+    className: role?.roleName ? "combat-readout--role" : "",
+  };
+}
+
+function renderCenter(state) {
+  const display = getCenterDisplay(state);
+  return `
+    <section class="combat-stage ${state.phase === PHASES.CPU_ATTACK ? "combat-stage--danger" : ""}">
+      <div class="stage-grid" aria-hidden="true"></div>
+      <div class="cpu-core ${state.phase === PHASES.PLAYER_ATTACK || state.phase === PHASES.VICTORY ? "cpu-core--hit" : ""}" aria-hidden="true">
+        <span class="cpu-core__ring cpu-core__ring--outer"></span>
+        <span class="cpu-core__ring cpu-core__ring--inner"></span>
+        <span class="cpu-core__eye"></span>
+      </div>
+      <div class="phase-chip"><span></span>${PHASE_LABELS[state.phase]}</div>
+      <div class="combat-readout ${display.className}" aria-live="polite">
+        <span class="combat-readout__kicker">${display.kicker}</span>
+        ${display.multiplier ? `<span class="combat-readout__multiplier">${display.multiplier}</span>` : ""}
+        <strong>${display.value}</strong>
+        <span class="combat-readout__unit">${display.unit}</span>
+      </div>
+      <p class="battle-message">${state.battleMessage}</p>
+    </section>
+  `;
+}
+
+function renderPreview(state) {
+  const selected = engine.getSelectedCard();
+  const preview = selected ? engine.getAttackPreview(selected.id) : null;
+  const role = preview
+    ? { roleName: preview.roleName, multiplier: preview.roleMultiplier }
+    : state.currentRole;
+
+  return `
+    <aside class="tactical-panel">
+      <div class="panel-heading">
+        <span class="eyebrow">TACTICAL SCAN</span>
+        <span class="panel-heading__status">LIVE</span>
+      </div>
+      <div class="preview-card ${selected ? "preview-card--active" : ""}">
+        <div class="preview-card__top">
+          <div>
+            <span class="preview-label">SELECTED CARD</span>
+            <h3>${selected?.name || "カードを選択"}</h3>
+          </div>
+          <span class="preview-die">${selected ? DIE_FACES[selected.dieValue] : "—"}</span>
+        </div>
+        <dl class="damage-formula">
+          <div><dt>BASE ATTACK</dt><dd>${preview?.baseAttack ?? "—"}</dd></div>
+          <div class="${preview?.passiveBonus ? "is-positive" : ""}"><dt>PASSIVE</dt><dd>${preview ? `+${preview.passiveBonus}` : "—"}</dd></div>
+          <div class="${preview?.temporaryBonus ? "is-positive" : ""}"><dt>TURN BUFF</dt><dd>${preview ? `+${preview.temporaryBonus}` : "—"}</dd></div>
+        </dl>
+        <div class="formula-divider"><span>×</span></div>
+        <div class="role-formula">
+          <span class="preview-label">HAND ROLE</span>
+          <div><strong>${role?.roleName || "NONE"}</strong><b>${multiplierLabel(role?.multiplier ?? 1)}</b></div>
+        </div>
+        <div class="final-damage">
+          <span>FINAL DAMAGE</span>
+          <strong>${preview?.finalAttack ?? "—"}</strong>
+        </div>
+        ${selected ? `<div class="selected-abilities">${abilityLabel(selected)}</div>` : `<p class="preview-hint">手札を選ぶと、常在効果と役を含む最終ダメージを確認できます。</p>`}
+      </div>
+      <div class="role-guide">
+        <span class="preview-label">ROLE QUICK GUIDE</span>
+        <div class="role-guide__row"><span>同じ目のみ</span><b>×4</b></div>
+        <div class="role-guide__row"><span>偶数 / 奇数のみ</span><b>×1.5</b></div>
+        <div class="role-guide__row role-guide__row--risk"><span>1・2・3を含む</span><b>×0.5</b></div>
+      </div>
+    </aside>
+  `;
+}
+
+function renderPoints(state) {
+  const dots = Array.from({ length: state.player.maxPoint }, (_, index) =>
+    `<i class="${index < state.player.point ? "is-filled" : ""}"></i>`,
+  ).join("");
+  const activeBonus = getTemporaryBonus(
+    state.player.temporaryEffects,
+    state.turn,
+  );
+  const pendingBonus = state.player.temporaryEffects
+    .filter((effect) => effect.activeFromTurn > state.turn)
+    .reduce((sum, effect) => sum + effect.value, 0);
+
+  return `
+    <div class="resource-bar">
+      <div class="point-bank">
+        <span class="resource-label">ENERGY</span>
+        <div class="point-dots" aria-label="ポイント ${state.player.point} / ${state.player.maxPoint}">${dots}</div>
+        <strong>${state.player.point}<small> / ${state.player.maxPoint}</small></strong>
+      </div>
+      <div class="resource-stats">
+        <span><i class="deck-icon"></i>DECK <b>${state.player.deck.length}</b></span>
+        <span><i class="discard-icon"></i>DISCARD <b>${state.player.discardPile.length}</b></span>
+        ${activeBonus ? `<span class="buff-chip">ATK +${activeBonus} ACTIVE</span>` : ""}
+        ${pendingBonus ? `<span class="buff-chip buff-chip--pending">NEXT ATK +${pendingBonus}</span>` : ""}
+      </div>
+    </div>
+  `;
+}
+
+function renderHand(state) {
+  if (!state.player.hand.length) {
+    return `
+      <div class="empty-hand">
+        <span>∅</span>
+        <strong>NO CARDS IN HAND</strong>
+        <small>次のドローフェーズでカードを引けます</small>
+      </div>
+    `;
+  }
+
+  return state.player.hand
+    .map((card, index) => {
+      const preview = engine.getAttackPreview(card.id);
+      const selected = card.id === state.selectedCardId;
+      const unaffordable = card.cost > state.player.point;
+      const interactive = state.phase === PHASES.CARD_SELECT && !unaffordable;
+      const bonus = preview.passiveBonus + preview.temporaryBonus;
+      return `
+        <button
+          class="battle-card die-${card.dieValue} ${selected ? "is-selected" : ""} ${unaffordable ? "is-locked" : ""}"
+          data-card-id="${card.id}"
+          style="--card-index:${index}"
+          ${interactive ? "" : "disabled"}
+          aria-pressed="${selected}"
+          aria-label="${card.name}、目${card.dieValue}、攻撃${card.attack}、コスト${card.cost}"
+        >
+          <span class="battle-card__edge"></span>
+          <span class="battle-card__cost"><small>COST</small>${card.cost}</span>
+          <span class="battle-card__index">${String(index + 1).padStart(2, "0")}</span>
+          <span class="battle-card__die" aria-hidden="true">${DIE_FACES[card.dieValue]}</span>
+          <span class="battle-card__name">${card.name}</span>
+          <span class="battle-card__attack"><small>ATK</small><b>${card.attack + bonus}</b>${bonus ? `<em>+${bonus}</em>` : ""}</span>
+          ${abilityLabel(card)}
+          ${unaffordable ? `<span class="locked-label">POINT SHORTAGE</span>` : ""}
+        </button>
+      `;
+    })
+    .join("");
+}
+
+function renderCommands(state) {
+  const selected = engine.getSelectedCard();
+  const canDraw =
+    state.player.point >= GAME_CONFIG.DRAW_COST && state.player.deck.length > 0;
+  const hasPlayableCard = state.player.hand.some(
+    (card) => card.cost <= state.player.point,
+  );
+
+  if (state.phase === PHASES.DRAW_SELECT) {
+    const disabledReason = !state.player.deck.length
+      ? "デッキが空です"
+      : `ポイントが${GAME_CONFIG.DRAW_COST}必要です`;
+    return `
+      <div class="command-copy">
+        <span class="command-step">01 / 02</span>
+        <div><strong>カードをドローしますか？</strong><small>1ポイントで手札を1枚増やせます</small></div>
+      </div>
+      <div class="command-actions">
+        <button class="command-button command-button--secondary" data-action="skip">SKIP</button>
+        <button class="command-button command-button--primary" data-action="draw" ${canDraw ? "" : "disabled"} title="${canDraw ? "" : disabledReason}">
+          <span>DRAW</span><small>−${GAME_CONFIG.DRAW_COST} PT</small>
+        </button>
+      </div>
+    `;
+  }
+
+  if (state.phase === PHASES.CARD_SELECT) {
+    return `
+      <div class="command-copy">
+        <span class="command-step">02 / 02</span>
+        <div><strong>${selected ? `${selected.name} で攻撃` : hasPlayableCard ? "使用するカードを選択" : "使用できるカードがありません"}</strong><small>${selected ? "使用前の手札で役を判定します" : hasPlayableCard ? "カードを選ぶとダメージを確認できます" : "ターンを終了してポイントを回復しましょう"}</small></div>
+      </div>
+      <div class="command-actions">
+        ${!hasPlayableCard ? `<button class="command-button command-button--danger" data-action="end-turn">END TURN</button>` : `<button class="command-button command-button--attack" data-action="attack" ${selected ? "" : "disabled"}><span>EXECUTE</span><small>ATTACK</small></button>`}
+      </div>
+    `;
+  }
+
+  return `
+    <div class="command-copy command-copy--center">
+      <div><strong>${state.phase === PHASES.CPU_ATTACK ? "CPUが行動中…" : "戦闘処理中…"}</strong><small>アクションが完了するまでお待ちください</small></div>
+    </div>
+    <div class="command-loader"><i></i><i></i><i></i></div>
+  `;
+}
+
+function renderResult(state) {
+  if (![PHASES.VICTORY, PHASES.DEFEAT].includes(state.phase)) return "";
+  const victory = state.phase === PHASES.VICTORY;
+  return `
+    <div class="result-overlay">
+      <div class="result-dialog result-dialog--${victory ? "victory" : "defeat"}" role="dialog" aria-modal="true" aria-labelledby="result-title">
+        <span class="result-dialog__mark">${victory ? "◆" : "×"}</span>
+        <span class="eyebrow">${victory ? "TARGET ELIMINATED" : "UNIT DISABLED"}</span>
+        <h2 id="result-title">${victory ? "YOU WIN" : "GAME OVER"}</h2>
+        <p>${victory ? `${state.turn}ターンでCPUを撃破しました。` : `CPUの攻撃に敗れました。戦術を組み直しましょう。`}</p>
+        <div class="result-stats">
+          <span><small>TURN</small><b>${state.turn}</b></span>
+          <span><small>CARDS USED</small><b>${state.player.discardPile.length}</b></span>
+          <span><small>HP LEFT</small><b>${state.player.hp}</b></span>
+        </div>
+        <button class="command-button command-button--primary" data-action="restart">RESTART BATTLE</button>
+      </div>
+    </div>
+  `;
+}
+
+function render() {
+  const state = engine.state;
+  app.innerHTML = `
+    <main class="battle-shell">
+      <header class="topbar">
+        <a class="brand" href="#" aria-label="DICE HAND 戦闘デモ">
+          <span class="brand__mark"><i>D<small>6</small></i></span>
+          <span><strong>DICE HAND</strong><small>TACTICAL CARD BATTLE</small></span>
+        </a>
+        <div class="topbar__center"><span>BATTLE</span><strong>#001</strong></div>
+        <button class="icon-button" data-action="restart" aria-label="バトルをリスタート" title="リスタート">↻</button>
+      </header>
+
+      <div class="battle-layout">
+        <div class="battle-board">
+          ${statusPanel(state.cpu, "CPU // AEGIS", "cpu")}
+          ${renderCenter(state)}
+          <div class="player-zone">
+            ${statusPanel(state.player, "PLAYER // DICER", "player")}
+            ${renderPoints(state)}
+          </div>
+        </div>
+        ${renderPreview(state)}
+      </div>
+
+      <section class="hand-section">
+        <div class="hand-heading">
+          <div><span class="eyebrow">YOUR ARSENAL</span><h2>HAND <b>${state.player.hand.length}</b></h2></div>
+          <div class="hand-role"><span>CURRENT ROLE</span><strong>${state.currentRole?.roleName || "NONE"}</strong><b>${multiplierLabel(state.currentRole?.multiplier ?? 1)}</b></div>
+        </div>
+        <div class="hand-track">${renderHand(state)}</div>
+      </section>
+
+      <section class="command-deck">${renderCommands(state)}</section>
+      ${renderResult(state)}
+    </main>
+  `;
+  bindEvents();
+}
+
+function proceedAfterPlayerAction() {
+  render();
+  if (engine.state.phase === PHASES.VICTORY) return;
+
+  schedule(() => {
+    if (!engine.startCpuTurn()) return;
+    render();
+    if (engine.state.phase === PHASES.DEFEAT) return;
+
+    schedule(() => {
+      if (engine.finishTurn()) render();
+    }, 950);
+  }, 1150);
+}
+
+function bindEvents() {
+  app.querySelectorAll("[data-card-id]").forEach((button) => {
+    button.addEventListener("click", () => {
+      if (engine.selectCard(button.dataset.cardId)) render();
+    });
+  });
+
+  app.querySelectorAll("[data-action]").forEach((button) => {
+    button.addEventListener("click", (event) => {
+      event.preventDefault();
+      const action = button.dataset.action;
+
+      if (action === "draw" && engine.chooseDraw(true)) render();
+      if (action === "skip" && engine.chooseDraw(false)) render();
+      if (action === "attack" && engine.useSelectedCard()) proceedAfterPlayerAction();
+      if (action === "end-turn" && engine.endTurnWithoutCard()) proceedAfterPlayerAction();
+      if (action === "restart") {
+        clearTimers();
+        engine = new BattleEngine(createInitialGameState());
+        render();
+      }
+    });
+  });
+}
+
+render();

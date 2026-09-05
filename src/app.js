@@ -1,5 +1,10 @@
 import { GAME_CONFIG, PHASES, PHASE_LABELS } from "./data/constants.js";
-import { getTemporaryBonus } from "./game/abilityLogic.js";
+import {
+  getTemporaryBonus,
+  isTacticalCard,
+  isWildCard,
+  requiredTargetCount,
+} from "./game/abilityLogic.js";
 import { BattleEngine } from "./game/battleEngine.js";
 import { createInitialGameState } from "./game/gameState.js";
 
@@ -8,6 +13,21 @@ const timers = new Set();
 const DIE_FACES = ["", "⚀", "⚁", "⚂", "⚃", "⚄", "⚅"];
 
 let engine = new BattleEngine(createInitialGameState());
+// 戦術カードの対象選択中だけ保持する UI 状態。
+let pendingTactical = null;
+
+function cancelTargeting() {
+  pendingTactical = null;
+}
+
+function tacticalLabel(ability) {
+  if (ability.type === "DIE_VALUE_SHIFT") {
+    return `目を ${ability.value > 0 ? "+" : ""}${ability.value}`;
+  }
+  if (ability.type === "HAND_POSITION_SWAP") return "2枚の位置を入替";
+  if (ability.type === "REDRAW_CARD") return "1枚捨てて引く";
+  return "TACTICAL";
+}
 
 function schedule(callback, delay) {
   const timer = window.setTimeout(() => {
@@ -31,6 +51,12 @@ function multiplierLabel(value) {
 }
 
 function abilityLabel(card) {
+  if (isTacticalCard(card)) {
+    return `<span class="ability ability--tactical"><i>◆</i> ${tacticalLabel(card.tacticalAbility)}</span>`;
+  }
+  if (isWildCard(card)) {
+    return `<span class="ability ability--wild"><i>◈</i> WILD DIE</span>`;
+  }
   if (card.onUseAbility?.type === "NEXT_TURN_ATTACK_BONUS") {
     return `<span class="ability ability--boost"><i>↗</i> NEXT TURN ATK +${card.onUseAbility.value}</span>`;
   }
@@ -209,30 +235,58 @@ function renderHand(state) {
     `;
   }
 
+  const targeting = Boolean(pendingTactical);
+
   return state.player.hand
     .map((card, index) => {
-      const preview = engine.getAttackPreview(card.id);
+      const tactical = isTacticalCard(card);
+      const preview = tactical ? null : engine.getAttackPreview(card.id);
       const selected = card.id === state.selectedCardId;
       const unaffordable = card.cost > state.player.point;
-      const interactive = state.phase === PHASES.CARD_SELECT && !unaffordable;
-      const bonus = preview.passiveBonus + preview.temporaryBonus;
+      const isSource = targeting && card.id === pendingTactical.cardId;
+      const isTarget = targeting && pendingTactical.targets.includes(card.id);
+      const interactive = targeting
+        ? state.phase === PHASES.CARD_SELECT
+        : state.phase === PHASES.CARD_SELECT && !unaffordable;
+      const bonus = preview ? preview.passiveBonus + preview.temporaryBonus : 0;
+      const tuned = card.dieValue !== card.baseDieValue;
+
+      const classes = [
+        "battle-card",
+        `die-${card.dieValue}`,
+        tactical ? "battle-card--tactical" : "",
+        isWildCard(card) ? "battle-card--wild" : "",
+        selected ? "is-selected" : "",
+        isSource ? "is-source" : "",
+        isTarget ? "is-target" : "",
+        targeting && !isSource ? "is-targetable" : "",
+        unaffordable && !targeting ? "is-locked" : "",
+      ]
+        .filter(Boolean)
+        .join(" ");
+
       return `
         <button
-          class="battle-card die-${card.dieValue} ${selected ? "is-selected" : ""} ${unaffordable ? "is-locked" : ""}"
+          class="${classes}"
           data-card-id="${card.id}"
           style="--card-index:${index}"
           ${interactive ? "" : "disabled"}
-          aria-pressed="${selected}"
-          aria-label="${card.name}、目${card.dieValue}、攻撃${card.attack}、コスト${card.cost}"
+          aria-pressed="${selected || isTarget}"
+          aria-label="${card.name}、目${card.dieValue}、${tactical ? tacticalLabel(card.tacticalAbility) : `攻撃${card.attack}`}、コスト${card.cost}"
         >
           <span class="battle-card__edge"></span>
           <span class="battle-card__cost"><small>COST</small>${card.cost}</span>
           <span class="battle-card__index">${String(index + 1).padStart(2, "0")}</span>
-          <span class="battle-card__die" aria-hidden="true">${DIE_FACES[card.dieValue]}</span>
+          <span class="battle-card__die" aria-hidden="true">${isWildCard(card) ? "◈" : DIE_FACES[card.dieValue]}</span>
+          ${tuned ? `<span class="tuned-flag">TUNED ${card.baseDieValue}→${card.dieValue}</span>` : ""}
           <span class="battle-card__name">${card.name}</span>
-          <span class="battle-card__attack"><small>ATK</small><b>${card.attack + bonus}</b>${bonus ? `<em>+${bonus}</em>` : ""}</span>
+          ${
+            tactical
+              ? `<span class="battle-card__attack battle-card__attack--tactical"><small>TACTICAL</small><b>—</b></span>`
+              : `<span class="battle-card__attack"><small>ATK</small><b>${card.attack + bonus}</b>${bonus ? `<em>+${bonus}</em>` : ""}</span>`
+          }
           ${abilityLabel(card)}
-          ${unaffordable ? `<span class="locked-label">POINT SHORTAGE</span>` : ""}
+          ${unaffordable && !targeting ? `<span class="locked-label">POINT SHORTAGE</span>` : ""}
         </button>
       `;
     })
@@ -245,9 +299,6 @@ function renderCommands(state) {
     state.player.deck.length + state.player.discardPile.length;
   const canDraw =
     state.player.point >= GAME_CONFIG.DRAW_COST && cardsAvailable > 0;
-  const hasPlayableCard = state.player.hand.some(
-    (card) => card.cost <= state.player.point,
-  );
 
   if (state.phase === PHASES.DRAW_SELECT) {
     const disabledReason = !cardsAvailable
@@ -267,14 +318,42 @@ function renderCommands(state) {
     `;
   }
 
+  if (state.phase === PHASES.CARD_SELECT && pendingTactical) {
+    const source = state.player.hand.find(
+      (card) => card.id === pendingTactical.cardId,
+    );
+    const remaining =
+      requiredTargetCount(source) - pendingTactical.targets.length;
+    return `
+      <div class="command-copy">
+        <span class="command-step">TARGETING</span>
+        <div><strong>${source.name}：対象をあと${remaining}枚選択</strong><small>${tacticalLabel(source.tacticalAbility)} — 手札のカードをクリックしてください</small></div>
+      </div>
+      <div class="command-actions">
+        <button class="command-button command-button--secondary" data-action="cancel-tactical">CANCEL</button>
+      </div>
+    `;
+  }
+
   if (state.phase === PHASES.CARD_SELECT) {
+    const canAttack = engine.hasPlayableAttackCard();
+    const headline = selected
+      ? `${selected.name} で攻撃`
+      : canAttack
+        ? "使用するカードを選択"
+        : "攻撃できるカードがありません";
+    const detail = selected
+      ? "使用前の手札で役を判定します"
+      : canAttack
+        ? "戦術カードは攻撃せず手札を操作します（ターンは終了しません）"
+        : "戦術カードで手札を整えるか、ターンを終了しましょう";
     return `
       <div class="command-copy">
         <span class="command-step">02 / 02</span>
-        <div><strong>${selected ? `${selected.name} で攻撃` : hasPlayableCard ? "使用するカードを選択" : "使用できるカードがありません"}</strong><small>${selected ? "使用前の手札で役を判定します" : hasPlayableCard ? "カードを選ぶとダメージを確認できます" : "ターンを終了してポイントを回復しましょう"}</small></div>
+        <div><strong>${headline}</strong><small>${detail}</small></div>
       </div>
       <div class="command-actions">
-        ${!hasPlayableCard ? `<button class="command-button command-button--danger" data-action="end-turn">END TURN</button>` : `<button class="command-button command-button--attack" data-action="attack" ${selected ? "" : "disabled"}><span>EXECUTE</span><small>ATTACK</small></button>`}
+        ${!canAttack ? `<button class="command-button command-button--danger" data-action="end-turn">END TURN</button>` : `<button class="command-button command-button--attack" data-action="attack" ${selected ? "" : "disabled"}><span>EXECUTE</span><small>ATTACK</small></button>`}
       </div>
     `;
   }
@@ -310,6 +389,11 @@ function renderResult(state) {
 
 function render() {
   const state = engine.state;
+  const targetingValid =
+    pendingTactical &&
+    state.phase === PHASES.CARD_SELECT &&
+    state.player.hand.some((card) => card.id === pendingTactical.cardId);
+  if (pendingTactical && !targetingValid) cancelTargeting();
   app.innerHTML = `
     <main class="battle-shell">
       <header class="topbar">
@@ -363,10 +447,54 @@ function proceedAfterPlayerAction() {
   }, 1150);
 }
 
+function handleCardClick(cardId) {
+  const state = engine.state;
+  if (state.phase !== PHASES.CARD_SELECT) return;
+
+  // 対象選択中：ソースをもう一度押すとキャンセル、それ以外は対象のトグル。
+  if (pendingTactical) {
+    if (cardId === pendingTactical.cardId) {
+      cancelTargeting();
+      render();
+      return;
+    }
+
+    const targets = pendingTactical.targets;
+    pendingTactical.targets = targets.includes(cardId)
+      ? targets.filter((id) => id !== cardId)
+      : [...targets, cardId];
+
+    const source = state.player.hand.find(
+      (card) => card.id === pendingTactical.cardId,
+    );
+    if (pendingTactical.targets.length === requiredTargetCount(source)) {
+      const played = engine.playTacticalCard(
+        pendingTactical.cardId,
+        pendingTactical.targets,
+      );
+      cancelTargeting();
+      if (!played) return;
+    }
+    render();
+    return;
+  }
+
+  const card = state.player.hand.find((item) => item.id === cardId);
+  if (!card || card.cost > state.player.point) return;
+
+  if (isTacticalCard(card)) {
+    pendingTactical = { cardId, targets: [] };
+    render();
+    return;
+  }
+
+  if (engine.selectCard(cardId)) render();
+}
+
 function bindEvents() {
   app.querySelectorAll("[data-card-id]").forEach((button) => {
     button.addEventListener("click", () => {
-      if (engine.selectCard(button.dataset.cardId)) render();
+      handleCardClick(button.dataset.cardId);
     });
   });
 
@@ -377,10 +505,21 @@ function bindEvents() {
 
       if (action === "draw" && engine.chooseDraw(true)) render();
       if (action === "skip" && engine.chooseDraw(false)) render();
-      if (action === "attack" && engine.useSelectedCard()) proceedAfterPlayerAction();
-      if (action === "end-turn" && engine.endTurnWithoutCard()) proceedAfterPlayerAction();
+      if (action === "cancel-tactical") {
+        cancelTargeting();
+        render();
+      }
+      if (action === "attack" && engine.useSelectedCard()) {
+        cancelTargeting();
+        proceedAfterPlayerAction();
+      }
+      if (action === "end-turn" && engine.endTurnWithoutCard()) {
+        cancelTargeting();
+        proceedAfterPlayerAction();
+      }
       if (action === "restart") {
         clearTimers();
+        cancelTargeting();
         engine = new BattleEngine(createInitialGameState());
         render();
       }

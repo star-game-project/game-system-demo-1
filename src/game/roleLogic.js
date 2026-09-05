@@ -1,4 +1,5 @@
 import { HAND_ROLES } from "../data/roles.js";
+import { isWildCard } from "./abilityLogic.js";
 
 const ROLE_BY_ID = Object.freeze(
   Object.fromEntries(HAND_ROLES.map((role) => [role.id, role])),
@@ -22,10 +23,11 @@ function meetsHandSize(roleId, hand) {
 export function evaluateHandRole(hand) {
   if (!hand.length) return { ...NO_ROLE };
 
-  const values = hand.map((card) => card.dieValue);
+  // ワイルドはプレイヤーに有利な目として扱うため、成立判定から除外する。
+  const values = hand.filter((card) => !isWildCard(card)).map((card) => card.dieValue);
   const uniqueValues = new Set(values);
 
-  if (uniqueValues.size === 1 && meetsHandSize("same_number", hand)) {
+  if (uniqueValues.size <= 1 && meetsHandSize("same_number", hand)) {
     return toResult("same_number");
   }
   if (values.every((value) => value % 2 === 0)) {
@@ -34,6 +36,7 @@ export function evaluateHandRole(hand) {
   if (values.every((value) => value % 2 === 1)) {
     return toResult("odd_only");
   }
+  // 1-2-3 は減算倍率なので、ワイルドを使って成立させることはしない。
   if ([1, 2, 3].every((value) => uniqueValues.has(value))) {
     return toResult("one_two_three");
   }

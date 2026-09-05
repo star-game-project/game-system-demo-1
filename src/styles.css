@@ -1305,3 +1305,95 @@ a:focus-visible {
     transition-duration: 0.01ms !important;
   }
 }
+
+/* ---------- 戦術カード / ワイルド / 対象選択 ---------- */
+
+.battle-card--tactical {
+  --card-accent: #7e8aa8;
+  border-style: dashed;
+}
+
+.battle-card--tactical .battle-card__die {
+  opacity: 0.55;
+}
+
+.battle-card--wild {
+  --card-accent: #ff9de0;
+}
+
+.battle-card--wild .battle-card__die {
+  text-shadow: 0 0 18px var(--card-accent);
+}
+
+.battle-card.is-targetable:not(:disabled) {
+  filter: brightness(0.82);
+}
+
+.battle-card.is-targetable:not(:disabled):hover {
+  filter: none;
+  border-color: var(--amber);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--amber) 45%, transparent);
+}
+
+.battle-card.is-source {
+  transform: translateY(-11px);
+  border-style: solid;
+  border-color: var(--amber);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--amber) 35%, transparent);
+}
+
+.battle-card.is-source::after {
+  content: "SELECT TARGET";
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background: var(--amber);
+  color: #17120a;
+  text-align: center;
+  padding: 3px;
+  font-size: 7px;
+  letter-spacing: 0.2em;
+  font-weight: 900;
+}
+
+.battle-card.is-target {
+  transform: translateY(-11px);
+  filter: none;
+  border-color: var(--lime);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--lime) 40%, transparent);
+}
+
+.battle-card.is-target::after {
+  content: "TARGET";
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background: var(--lime);
+  color: #101705;
+  text-align: center;
+  padding: 3px;
+  font-size: 7px;
+  letter-spacing: 0.2em;
+  font-weight: 900;
+}
+
+.tuned-flag {
+  position: absolute;
+  top: 52px;
+  right: 12px;
+  font-size: 7px;
+  font-weight: 900;
+  letter-spacing: 0.12em;
+  color: var(--amber);
+  border: 1px solid color-mix(in srgb, var(--amber) 45%, transparent);
+  padding: 2px 5px;
+}
+
+.battle-card__attack--tactical b {
+  color: var(--muted);
+}
+
+.ability--tactical { color: #b9c4dd; }
+.ability--wild { color: #ff9de0; }

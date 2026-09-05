@@ -3,9 +3,11 @@ import assert from "node:assert/strict";
 import { GAME_CONFIG, PHASES } from "../src/data/constants.js";
 import { createDemoDeck } from "../src/data/cards.js";
 import { BattleEngine } from "../src/game/battleEngine.js";
+import { isTacticalCard, isWildCard } from "../src/game/abilityLogic.js";
+import { evaluateHandRole } from "../src/game/roleLogic.js";
 import { createInitialGameState } from "../src/game/gameState.js";
 
-test("demo deck has the specified 20-card distribution", () => {
+test("demo deck keeps twenty cards split into attack and tactical roles", () => {
   const deck = createDemoDeck();
   assert.equal(deck.length, GAME_CONFIG.DECK_SIZE);
   assert.deepEqual(
@@ -16,14 +18,22 @@ test("demo deck has the specified 20-card distribution", () => {
       ]),
     ),
     {
-      "Strike 1": 4,
-      "Boost 2": 3,
-      "Support 3": 3,
-      "Strike 4": 4,
-      "Heavy 5": 3,
-      "Heavy 6": 3,
+      "Strike 1": 2,
+      "Boost 2": 2,
+      "Support 3": 2,
+      "Strike 4": 3,
+      "Heavy 5": 2,
+      "Heavy 6": 2,
+      "Wild Die": 1,
+      "Tune Up": 2,
+      "Tune Down": 2,
+      Reorder: 1,
+      Recycle: 1,
     },
   );
+  assert.equal(deck.filter(isTacticalCard).length, 6);
+  assert.equal(deck.filter(isWildCard).length, 1);
+  assert.ok(deck.every((card) => card.baseDieValue === card.dieValue));
 });
 
 test("battle starts with five free cards, full points and fifteen-card deck", () => {
@@ -151,4 +161,140 @@ test("cards played is tracked separately from the discard pile", () => {
   engine.finishTurn();
   assert.equal(engine.state.player.cardsPlayed, 1);
   assert.equal(engine.state.player.discardPile.length, 5);
+});
+
+
+const tacticalHand = () => [
+  { id: "t_up", name: "Tune Up", cost: 1, attack: 0, dieValue: 4, baseDieValue: 4,
+    onUseAbility: null, passiveAbility: null,
+    tacticalAbility: { type: "DIE_VALUE_SHIFT", value: 1 } },
+  { id: "t_swap", name: "Reorder", cost: 1, attack: 0, dieValue: 2, baseDieValue: 2,
+    onUseAbility: null, passiveAbility: null,
+    tacticalAbility: { type: "HAND_POSITION_SWAP" } },
+  { id: "t_redraw", name: "Recycle", cost: 1, attack: 0, dieValue: 5, baseDieValue: 5,
+    onUseAbility: null, passiveAbility: null,
+    tacticalAbility: { type: "REDRAW_CARD" } },
+  { id: "a_five", name: "Heavy 5", cost: 3, attack: 20, dieValue: 5, baseDieValue: 5,
+    onUseAbility: null, passiveAbility: null, tacticalAbility: null },
+  { id: "a_six", name: "Heavy 6", cost: 3, attack: 25, dieValue: 6, baseDieValue: 6,
+    onUseAbility: null, passiveAbility: null, tacticalAbility: null },
+];
+
+const card = (id, dieValue, overrides = {}) => ({
+  id,
+  name: id,
+  cost: 1,
+  attack: 10,
+  dieValue,
+  baseDieValue: dieValue,
+  onUseAbility: null,
+  passiveAbility: null,
+  tacticalAbility: null,
+  ...overrides,
+});
+
+function engineWithHand(hand) {
+  const state = createInitialGameState(() => 0.5);
+  state.phase = PHASES.CARD_SELECT;
+  state.player.hand = hand;
+  state.currentRole = evaluateHandRole(hand);
+  return new BattleEngine(state, () => 0.5);
+}
+
+function tacticalEngine() {
+  return engineWithHand(tacticalHand());
+}
+
+test("a tactical card shifts a die, spends a point and does not end the turn", () => {
+  const engine = tacticalEngine();
+  const pointBefore = engine.state.player.point;
+
+  const result = engine.playTacticalCard("t_up", ["a_five"]);
+
+  assert.ok(result);
+  assert.equal(engine.state.phase, PHASES.CARD_SELECT);
+  assert.equal(engine.state.player.point, pointBefore - 1);
+  assert.equal(engine.state.player.hand.find((c) => c.id === "a_five").dieValue, 6);
+  assert.equal(engine.state.player.hand.find((c) => c.id === "t_up"), undefined);
+  assert.equal(engine.state.player.discardPile.at(-1).id, "t_up");
+});
+
+test("shifting a die is clamped to the one-to-six range", () => {
+  const engine = tacticalEngine();
+  engine.playTacticalCard("t_up", ["a_six"]);
+  assert.equal(engine.state.player.hand.find((c) => c.id === "a_six").dieValue, 6);
+});
+
+test("tuning a die into place completes SAME NUMBER before the attack", () => {
+  const engine = engineWithHand([
+    card("t_up", 4, {
+      attack: 0,
+      tacticalAbility: { type: "DIE_VALUE_SHIFT", value: 1 },
+    }),
+    card("five", 5),
+    card("six", 6),
+  ]);
+  assert.equal(engine.state.currentRole.roleId, null);
+
+  engine.playTacticalCard("t_up", ["five"]);
+
+  assert.equal(engine.state.currentRole.roleId, "same_number");
+  assert.equal(engine.state.currentRole.multiplier, 4);
+
+  // 役倍率は攻撃前に反映される。
+  engine.selectCard("six");
+  assert.equal(engine.getAttackPreview("six").finalAttack, 40);
+});
+
+test("position swap reorders the hand without changing the role", () => {
+  const engine = engineWithHand([
+    card("a", 2),
+    card("swap", 2, {
+      attack: 0,
+      tacticalAbility: { type: "HAND_POSITION_SWAP" },
+    }),
+    card("b", 4),
+    card("c", 6),
+  ]);
+  assert.equal(engine.state.currentRole.roleId, "even_only");
+
+  engine.playTacticalCard("swap", ["a", "c"]);
+
+  assert.deepEqual(engine.state.player.hand.map((item) => item.id), ["c", "b", "a"]);
+  // 目の内訳は変わらないので役も変わらない。
+  assert.equal(engine.state.currentRole.roleId, "even_only");
+});
+
+test("redraw discards the target and draws a replacement", () => {
+  const engine = tacticalEngine();
+  const deckBefore = engine.state.player.deck.length;
+
+  engine.playTacticalCard("t_redraw", ["a_six"]);
+
+  const { player } = engine.state;
+  assert.equal(player.hand.length, 4);
+  assert.equal(player.hand.some((card) => card.id === "a_six"), false);
+  assert.equal(player.deck.length, deckBefore - 1);
+  assert.ok(player.discardPile.some((card) => card.id === "a_six"));
+});
+
+test("tactical cards are rejected as attacks and by bad targeting", () => {
+  const engine = tacticalEngine();
+
+  assert.equal(engine.selectCard("t_up"), false);
+  assert.equal(engine.state.selectedCardId, null);
+  assert.equal(engine.playTacticalCard("a_five", ["a_six"]), null);
+  assert.equal(engine.playTacticalCard("t_up", []), null);
+  assert.equal(engine.playTacticalCard("t_up", ["t_up"]), null);
+  assert.equal(engine.playTacticalCard("t_swap", ["a_five"]), null);
+  assert.equal(engine.state.player.hand.length, 5);
+});
+
+test("a hand of only tactical cards allows ending the turn", () => {
+  const engine = tacticalEngine();
+  engine.state.player.hand = tacticalHand().filter(isTacticalCard);
+
+  assert.equal(engine.hasPlayableAttackCard(), false);
+  assert.equal(engine.endTurnWithoutCard(), true);
+  assert.equal(engine.state.phase, PHASES.PLAYER_ATTACK);
 });

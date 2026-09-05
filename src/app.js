@@ -1,4 +1,26 @@
-import { GAME_CONFIG, PHASES, PHASE_LABELS } from "./data/constants.js";
+import {
+  DECK_RULES,
+  GAME_CONFIG,
+  PHASES,
+  PHASE_LABELS,
+  SCREENS,
+} from "./data/constants.js";
+import {
+  CARD_CATALOGUE,
+  DEFAULT_DECK_COUNTS,
+  createDeckFromCounts,
+} from "./data/cards.js";
+import { BONUS_ROLES, PENALTY_ROLES } from "./data/roles.js";
+import {
+  addCard,
+  bucketLimit,
+  canAddCard,
+  createEmptyCounts,
+  dieBucket,
+  removeCard,
+  summarizeDeck,
+  validateDeck,
+} from "./game/deckBuilder.js";
 import {
   getTemporaryBonus,
   isTacticalCard,
@@ -12,9 +34,20 @@ const app = document.querySelector("#app");
 const timers = new Set();
 const DIE_FACES = ["", "⚀", "⚁", "⚂", "⚃", "⚄", "⚅"];
 
-let engine = new BattleEngine(createInitialGameState());
+let screen = SCREENS.DECK_BUILD;
+let deckCounts = { ...createEmptyCounts(), ...DEFAULT_DECK_COUNTS };
+let engine = null;
 // 戦術カードの対象選択中だけ保持する UI 状態。
 let pendingTactical = null;
+
+function startBattle() {
+  clearTimers();
+  pendingTactical = null;
+  engine = new BattleEngine(
+    createInitialGameState(Math.random, createDeckFromCounts(deckCounts)),
+  );
+  screen = SCREENS.BATTLE;
+}
 
 function cancelTargeting() {
   pendingTactical = null;
@@ -381,13 +414,140 @@ function renderResult(state) {
           <span><small>CARDS USED</small><b>${state.player.cardsPlayed}</b></span>
           <span><small>HP LEFT</small><b>${state.player.hp}</b></span>
         </div>
-        <button class="command-button command-button--primary" data-action="restart">RESTART BATTLE</button>
+        <div class="result-actions">
+          <button class="command-button command-button--secondary" data-action="edit-deck">EDIT DECK</button>
+          <button class="command-button command-button--primary" data-action="restart">REMATCH</button>
+        </div>
       </div>
     </div>
   `;
 }
 
+
+function dieGlyph(definition) {
+  return dieBucket(definition) === "wild" ? "◈" : DIE_FACES[definition.dieValue];
+}
+
+function renderDieBudget(summary) {
+  return ["1", "2", "3", "4", "5", "6", "wild"]
+    .map((bucket) => {
+      const key = bucket === "wild" ? "wild" : Number(bucket);
+      const count = summary.byDie[key];
+      const limit = bucketLimit(key);
+      const full = count >= limit;
+      return `
+        <div class="die-budget ${full ? "is-full" : ""} ${bucket === "wild" ? "die-budget--wild" : `die-${bucket}`}">
+          <span class="die-budget__face">${bucket === "wild" ? "◈" : DIE_FACES[Number(bucket)]}</span>
+          <b>${count}<small>/${limit}</small></b>
+        </div>
+      `;
+    })
+    .join("");
+}
+
+function renderCatalogue() {
+  return CARD_CATALOGUE.map((definition) => {
+    const count = deckCounts[definition.key] ?? 0;
+    const tactical = Boolean(definition.tacticalAbility);
+    const addable = canAddCard(deckCounts, definition.key);
+    const bucket = dieBucket(definition);
+    return `
+      <article class="catalogue-card ${bucket === "wild" ? "catalogue-card--wild" : `die-${definition.dieValue}`} ${tactical ? "catalogue-card--tactical" : ""} ${count ? "is-included" : ""}">
+        <header>
+          <span class="catalogue-card__die">${dieGlyph(definition)}</span>
+          <div>
+            <strong>${definition.name}</strong>
+            <small>${tactical ? "TACTICAL" : `ATK ${definition.attack}`} / COST ${definition.cost}</small>
+          </div>
+        </header>
+        ${abilityLabel(definition)}
+        <div class="catalogue-card__stepper">
+          <button type="button" data-deck-remove="${definition.key}" ${count ? "" : "disabled"} aria-label="${definition.name} を1枚減らす">−</button>
+          <b>${count}</b>
+          <button type="button" data-deck-add="${definition.key}" ${addable ? "" : "disabled"} aria-label="${definition.name} を1枚増やす">+</button>
+        </div>
+      </article>
+    `;
+  }).join("");
+}
+
+function renderRoleTable() {
+  // 倍率の高い順に並べ、減算役は最後にまとめる。
+  return [...BONUS_ROLES, ...PENALTY_ROLES].map(
+    (role) => `
+      <div class="role-table__row ${role.kind === "penalty" ? "role-table__row--risk" : ""}">
+        <span>${role.name}</span>
+        <small>${role.description}</small>
+        <b>${multiplierLabel(role.multiplier)}</b>
+      </div>
+    `,
+  ).join("");
+}
+
+function renderDeckBuild() {
+  const { valid, errors, summary } = validateDeck(deckCounts);
+  return `
+    <main class="build-shell">
+      <header class="topbar">
+        <a class="brand" href="#" aria-label="DICE HAND デッキ構築">
+          <span class="brand__mark"><i>D<small>6</small></i></span>
+          <span><strong>DICE HAND</strong><small>DECK CONSTRUCTION</small></span>
+        </a>
+        <div class="topbar__center"><span>DECK</span><strong>${summary.total} / ${DECK_RULES.DECK_SIZE}</strong></div>
+        <button class="command-button command-button--primary" data-action="start-battle" ${valid ? "" : "disabled"}>
+          <span>BATTLE START</span><small>${valid ? "READY" : "デッキ未完成"}</small>
+        </button>
+      </header>
+
+      <section class="build-summary">
+        <div class="build-summary__budget">
+          <span class="eyebrow">DIE BUDGET</span>
+          <div class="die-budget-track">${renderDieBudget(summary)}</div>
+          <small>同じ目は最大${DECK_RULES.MAX_PER_DIE_VALUE}枚、ワイルドは最大${DECK_RULES.MAX_WILD_CARDS}枚。役を作るため必ず5種類以上の目が混ざります。</small>
+        </div>
+        <dl class="build-summary__stats">
+          <div><dt>ATTACK</dt><dd>${summary.attackCount}</dd></div>
+          <div><dt>TACTICAL</dt><dd>${summary.tacticalCount}</dd></div>
+          <div><dt>AVG COST</dt><dd>${summary.averageCost.toFixed(1)}</dd></div>
+          <div><dt>AVG ATK</dt><dd>${summary.averageAttack.toFixed(1)}</dd></div>
+        </dl>
+      </section>
+
+      ${
+        errors.length
+          ? `<ul class="build-errors">${errors.map((error) => `<li>${error}</li>`).join("")}</ul>`
+          : `<p class="build-ready">デッキが完成しました。BATTLE START で戦闘を開始できます。</p>`
+      }
+
+      <div class="build-layout">
+        <section class="catalogue">
+          <div class="build-heading">
+            <div><span class="eyebrow">CARD LIST</span><h2>カード一覧</h2></div>
+            <div class="build-actions">
+              <button class="command-button command-button--secondary" data-action="deck-preset">おすすめ構成</button>
+              <button class="command-button command-button--secondary" data-action="deck-clear">すべて外す</button>
+            </div>
+          </div>
+          <div class="catalogue-grid">${renderCatalogue()}</div>
+        </section>
+
+        <aside class="role-table">
+          <span class="eyebrow">ROLE LIST</span>
+          <p class="role-table__hint">手札全体の目で役が決まります。倍率が最も高い役だけが適用されます。</p>
+          ${renderRoleTable()}
+        </aside>
+      </div>
+    </main>
+  `;
+}
+
 function render() {
+  if (screen === SCREENS.DECK_BUILD) {
+    app.innerHTML = renderDeckBuild();
+    bindEvents();
+    return;
+  }
+
   const state = engine.state;
   const targetingValid =
     pendingTactical &&
@@ -402,7 +562,10 @@ function render() {
           <span><strong>DICE HAND</strong><small>TACTICAL CARD BATTLE</small></span>
         </a>
         <div class="topbar__center"><span>BATTLE</span><strong>#001</strong></div>
-        <button class="icon-button" data-action="restart" aria-label="バトルをリスタート" title="リスタート">↻</button>
+        <div class="topbar__actions">
+          <button class="icon-button" data-action="edit-deck" aria-label="デッキを編集" title="デッキを編集">☰</button>
+          <button class="icon-button" data-action="restart" aria-label="同じデッキで再戦" title="同じデッキで再戦">↻</button>
+        </div>
       </header>
 
       <div class="battle-layout">
@@ -492,6 +655,20 @@ function handleCardClick(cardId) {
 }
 
 function bindEvents() {
+  app.querySelectorAll("[data-deck-add]").forEach((button) => {
+    button.addEventListener("click", () => {
+      deckCounts = addCard(deckCounts, button.dataset.deckAdd);
+      render();
+    });
+  });
+
+  app.querySelectorAll("[data-deck-remove]").forEach((button) => {
+    button.addEventListener("click", () => {
+      deckCounts = removeCard(deckCounts, button.dataset.deckRemove);
+      render();
+    });
+  });
+
   app.querySelectorAll("[data-card-id]").forEach((button) => {
     button.addEventListener("click", () => {
       handleCardClick(button.dataset.cardId);
@@ -517,10 +694,26 @@ function bindEvents() {
         cancelTargeting();
         proceedAfterPlayerAction();
       }
-      if (action === "restart") {
+      if (action === "start-battle" && validateDeck(deckCounts).valid) {
+        startBattle();
+        render();
+      }
+      if (action === "deck-preset") {
+        deckCounts = { ...createEmptyCounts(), ...DEFAULT_DECK_COUNTS };
+        render();
+      }
+      if (action === "deck-clear") {
+        deckCounts = createEmptyCounts();
+        render();
+      }
+      if (action === "edit-deck") {
         clearTimers();
         cancelTargeting();
-        engine = new BattleEngine(createInitialGameState());
+        screen = SCREENS.DECK_BUILD;
+        render();
+      }
+      if (action === "restart") {
+        startBattle();
         render();
       }
     });

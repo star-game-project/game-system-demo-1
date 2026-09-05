@@ -1,13 +1,26 @@
 export const GAME_CONFIG = Object.freeze({
-  PLAYER_MAX_HP: 100,
-  CPU_MAX_HP: 100,
+  PLAYER_MAX_HP: 120,
+  CPU_MAX_HP: 360,
   START_POINT: 10,
   MAX_POINT: 10,
   TURN_POINT_RECOVERY: 5,
   DRAW_COST: 1,
   START_HAND_SIZE: 5,
   DECK_SIZE: 20,
-  CPU_ATTACK_DAMAGE: 10,
+  CPU_ATTACK_DAMAGE: 14,
+});
+
+/** デッキ構築の制約。目を最大4枚に抑えることで、単一の目に寄せたデッキを防ぐ。 */
+export const DECK_RULES = Object.freeze({
+  DECK_SIZE: 20,
+  MAX_PER_DIE_VALUE: 4,
+  MAX_WILD_CARDS: 2,
+  MAX_COPIES_PER_CARD: 4,
+});
+
+export const SCREENS = Object.freeze({
+  DECK_BUILD: "DECK_BUILD",
+  BATTLE: "BATTLE",
 });
 
 export const PHASES = Object.freeze({

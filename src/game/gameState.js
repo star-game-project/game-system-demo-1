@@ -3,8 +3,8 @@ import { createDemoDeck } from "../data/cards.js";
 import { drawCards, shuffleDeck } from "./deckLogic.js";
 import { evaluateHandRole } from "./roleLogic.js";
 
-export function createInitialGameState(random = Math.random) {
-  const shuffled = shuffleDeck(createDemoDeck(), random);
+export function createInitialGameState(random = Math.random, deckCards = null) {
+  const shuffled = shuffleDeck(deckCards ?? createDemoDeck(), random);
   const openingDraw = drawCards(shuffled, GAME_CONFIG.START_HAND_SIZE);
 
   return {

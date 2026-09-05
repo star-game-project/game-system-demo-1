@@ -34,7 +34,9 @@ test("passive and temporary bonuses are added before the role multiplier", () =>
   assert.equal(result.passiveBonus, 5);
   assert.equal(result.temporaryBonus, 5);
   assert.equal(result.roleName, "ODD");
-  assert.equal(result.finalAttack, 30);
+  assert.equal(result.roleMultiplier, 2.8);
+  // (10 + 5 + 5) × 2.8 = 56
+  assert.equal(result.finalAttack, 56);
 });
 
 test("right-card passive does not buff the support card itself", () => {

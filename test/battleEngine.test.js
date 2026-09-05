@@ -1,39 +1,34 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { GAME_CONFIG, PHASES } from "../src/data/constants.js";
-import { createDemoDeck } from "../src/data/cards.js";
+import {
+  CARD_CATALOGUE,
+  DEFAULT_DECK_COUNTS,
+  createDeckFromCounts,
+  createDemoDeck,
+} from "../src/data/cards.js";
+import { DECK_RULES } from "../src/data/constants.js";
+import { validateDeck } from "../src/game/deckBuilder.js";
 import { BattleEngine } from "../src/game/battleEngine.js";
 import { isTacticalCard, isWildCard } from "../src/game/abilityLogic.js";
 import { evaluateHandRole } from "../src/game/roleLogic.js";
 import { createInitialGameState } from "../src/game/gameState.js";
 
-test("demo deck keeps twenty cards split into attack and tactical roles", () => {
+test("the default deck is a legal twenty-card build", () => {
   const deck = createDemoDeck();
-  assert.equal(deck.length, GAME_CONFIG.DECK_SIZE);
-  assert.deepEqual(
-    Object.fromEntries(
-      [...new Set(deck.map((card) => card.name))].map((name) => [
-        name,
-        deck.filter((card) => card.name === name).length,
-      ]),
-    ),
-    {
-      "Strike 1": 2,
-      "Boost 2": 2,
-      "Support 3": 2,
-      "Strike 4": 3,
-      "Heavy 5": 2,
-      "Heavy 6": 2,
-      "Wild Die": 1,
-      "Tune Up": 2,
-      "Tune Down": 2,
-      Reorder: 1,
-      Recycle: 1,
-    },
-  );
-  assert.equal(deck.filter(isTacticalCard).length, 6);
+  assert.equal(deck.length, DECK_RULES.DECK_SIZE);
+  assert.equal(validateDeck(DEFAULT_DECK_COUNTS).valid, true);
+  assert.ok(deck.some(isTacticalCard));
   assert.equal(deck.filter(isWildCard).length, 1);
   assert.ok(deck.every((card) => card.baseDieValue === card.dieValue));
+});
+
+test("every catalogue card can be built into a deck", () => {
+  CARD_CATALOGUE.forEach((definition) => {
+    const built = createDeckFromCounts({ [definition.key]: 1 });
+    assert.equal(built.length, 1);
+    assert.equal(built[0].name, definition.name);
+  });
 });
 
 test("battle starts with five free cards, full points and fifteen-card deck", () => {
@@ -76,7 +71,7 @@ test("used card is included in role check and then moves to discard", () => {
   assert.equal(result.finalAttack, 5);
   assert.equal(engine.state.player.hand.length, 2);
   assert.equal(engine.state.player.discardPile.at(-1).id, "die_3");
-  assert.equal(engine.state.cpu.hp, 95);
+  assert.equal(engine.state.cpu.hp, GAME_CONFIG.CPU_MAX_HP - 5);
 });
 
 test("CPU attacks, points recover with a max of ten, and turn advances", () => {
@@ -86,7 +81,7 @@ test("CPU attacks, points recover with a max of ten, and turn advances", () => {
   const engine = new BattleEngine(state);
 
   assert.equal(engine.startCpuTurn(), true);
-  assert.equal(engine.state.player.hp, 90);
+  assert.equal(engine.state.player.hp, GAME_CONFIG.PLAYER_MAX_HP - GAME_CONFIG.CPU_ATTACK_DAMAGE);
   assert.equal(engine.finishTurn(), true);
   assert.equal(engine.state.player.point, 10);
   assert.equal(engine.state.turn, 2);
@@ -227,14 +222,15 @@ test("shifting a die is clamped to the one-to-six range", () => {
 
 test("tuning a die into place completes SAME NUMBER before the attack", () => {
   const engine = engineWithHand([
-    card("t_up", 4, {
+    card("t_up", 2, {
       attack: 0,
       tacticalAbility: { type: "DIE_VALUE_SHIFT", value: 1 },
     }),
     card("five", 5),
     card("six", 6),
+    card("six_b", 6),
   ]);
-  assert.equal(engine.state.currentRole.roleId, null);
+  assert.equal(engine.state.currentRole.roleId, "pair");
 
   engine.playTacticalCard("t_up", ["five"]);
 

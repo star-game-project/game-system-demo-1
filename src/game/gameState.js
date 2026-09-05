@@ -18,6 +18,7 @@ export function createInitialGameState(random = Math.random) {
       deck: openingDraw.deck,
       hand: openingDraw.drawn,
       discardPile: [],
+      cardsPlayed: 0,
       temporaryEffects: [],
     },
     cpu: {
@@ -27,6 +28,6 @@ export function createInitialGameState(random = Math.random) {
     selectedCardId: null,
     currentRole: evaluateHandRole(openingDraw.drawn),
     lastAttack: null,
-    battleMessage: "5枚のカードをドロー。あなたのターンです。",
+    battleMessage: `${GAME_CONFIG.START_HAND_SIZE}枚のカードをドロー。あなたのターンです。`,
   };
 }

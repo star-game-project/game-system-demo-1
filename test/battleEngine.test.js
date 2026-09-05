@@ -82,3 +82,73 @@ test("CPU attacks, points recover with a max of ten, and turn advances", () => {
   assert.equal(engine.state.turn, 2);
   assert.equal(engine.state.phase, PHASES.DRAW_SELECT);
 });
+
+test("ending a turn discards the whole hand and deals a fresh one", () => {
+  const state = createInitialGameState(() => 0.5);
+  state.phase = PHASES.PLAYER_ATTACK;
+  const oldHandIds = state.player.hand.map((card) => card.id);
+  const engine = new BattleEngine(state);
+
+  engine.startCpuTurn();
+  engine.finishTurn();
+
+  const { player } = engine.state;
+  assert.equal(player.hand.length, GAME_CONFIG.START_HAND_SIZE);
+  assert.equal(player.deck.length, 10);
+  assert.deepEqual(
+    oldHandIds.filter((id) => !player.discardPile.some((card) => card.id === id)),
+    [],
+  );
+  assert.equal(
+    player.deck.length + player.hand.length + player.discardPile.length,
+    GAME_CONFIG.DECK_SIZE,
+  );
+});
+
+test("an empty deck is rebuilt by shuffling the discard pile back in", () => {
+  const state = createInitialGameState(() => 0.5);
+  state.phase = PHASES.PLAYER_ATTACK;
+  state.player.discardPile = state.player.deck;
+  state.player.deck = [];
+  const engine = new BattleEngine(state, () => 0.5);
+
+  engine.startCpuTurn();
+  engine.finishTurn();
+
+  const { player } = engine.state;
+  assert.equal(player.hand.length, GAME_CONFIG.START_HAND_SIZE);
+  assert.equal(
+    player.deck.length + player.hand.length + player.discardPile.length,
+    GAME_CONFIG.DECK_SIZE,
+  );
+  assert.match(engine.state.battleMessage, /捨て札をシャッフル/);
+});
+
+test("drawing recycles the discard pile once the deck runs dry", () => {
+  const state = createInitialGameState(() => 0.5);
+  state.player.discardPile = state.player.deck;
+  state.player.deck = [];
+  const engine = new BattleEngine(state, () => 0.5);
+
+  assert.equal(engine.chooseDraw(true), true);
+  const { player } = engine.state;
+  assert.equal(player.hand.length, GAME_CONFIG.START_HAND_SIZE + 1);
+  assert.equal(player.discardPile.length, 0);
+  assert.equal(player.deck.length, 14);
+  assert.equal(player.point, 9);
+});
+
+test("cards played is tracked separately from the discard pile", () => {
+  const state = createInitialGameState(() => 0.5);
+  state.phase = PHASES.CARD_SELECT;
+  const engine = new BattleEngine(state, () => 0.5);
+
+  engine.selectCard(state.player.hand[0].id);
+  engine.useSelectedCard();
+  assert.equal(engine.state.player.cardsPlayed, 1);
+
+  engine.startCpuTurn();
+  engine.finishTurn();
+  assert.equal(engine.state.player.cardsPlayed, 1);
+  assert.equal(engine.state.player.discardPile.length, 5);
+});

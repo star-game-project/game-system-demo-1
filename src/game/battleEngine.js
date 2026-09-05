@@ -1,5 +1,5 @@
 import { GAME_CONFIG, PHASES } from "../data/constants.js";
-import { drawCards } from "./deckLogic.js";
+import { drawWithRecycle } from "./deckLogic.js";
 import { evaluateHandRole } from "./roleLogic.js";
 import { calculateAttack } from "./damageLogic.js";
 import {
@@ -8,8 +8,41 @@ import {
 } from "./abilityLogic.js";
 
 export class BattleEngine {
-  constructor(initialState) {
+  constructor(initialState, random = Math.random) {
     this.state = initialState;
+    this.random = random;
+  }
+
+  /** 山札から引く。山札が尽きたら捨て札をシャッフルして再構築する。 */
+  drawIntoHand(amount) {
+    const { player } = this.state;
+    const result = drawWithRecycle(
+      player.deck,
+      player.discardPile,
+      amount,
+      this.random,
+    );
+    player.deck = result.deck;
+    player.discardPile = result.discardPile;
+    player.hand.push(...result.drawn);
+    return result;
+  }
+
+  /** ターン終了時に手札をすべて捨て札へ送る。 */
+  discardHand() {
+    const { player } = this.state;
+    const discarded = player.hand;
+    player.discardPile.push(...discarded);
+    player.hand = [];
+    return discarded;
+  }
+
+  canDraw() {
+    const { player } = this.state;
+    return (
+      player.point >= GAME_CONFIG.DRAW_COST &&
+      player.deck.length + player.discardPile.length > 0
+    );
   }
 
   chooseDraw(shouldDraw) {
@@ -17,12 +50,14 @@ export class BattleEngine {
     if (this.state.phase !== PHASES.DRAW_SELECT) return false;
 
     if (shouldDraw) {
-      if (player.point < GAME_CONFIG.DRAW_COST || !player.deck.length) return false;
-      const result = drawCards(player.deck, 1);
-      player.deck = result.deck;
-      player.hand.push(...result.drawn);
+      if (!this.canDraw()) return false;
+      const result = this.drawIntoHand(1);
+      if (!result.drawn.length) return false;
       player.point = Math.max(0, player.point - GAME_CONFIG.DRAW_COST);
-      this.state.battleMessage = `${result.drawn[0].name} をドローしました。`;
+      const recycleNote = result.recycleCount
+        ? "捨て札をシャッフルして山札を再構築。"
+        : "";
+      this.state.battleMessage = `${recycleNote}${result.drawn[0].name} をドローしました。`;
     } else {
       this.state.battleMessage = "ドローをスキップしました。";
     }
@@ -72,6 +107,7 @@ export class BattleEngine {
     this.state.cpu.hp = Math.max(0, this.state.cpu.hp - attack.finalAttack);
     this.state.player.hand = this.state.player.hand.filter((item) => item.id !== card.id);
     this.state.player.discardPile.push(card);
+    this.state.player.cardsPlayed += 1;
     this.state.currentRole = evaluateHandRole(this.state.player.hand);
     this.state.lastAttack = { ...attack, cardName: card.name };
     this.state.selectedCardId = null;
@@ -108,10 +144,18 @@ export class BattleEngine {
       this.state.player.temporaryEffects,
       this.state.turn,
     );
+
+    // 手札はターン終了時にすべて捨て札へ送り、新しい手札を引き直す。
+    const discarded = this.discardHand();
+    const refill = this.drawIntoHand(GAME_CONFIG.START_HAND_SIZE);
+
     this.state.selectedCardId = null;
     this.state.currentRole = evaluateHandRole(this.state.player.hand);
     this.state.phase = PHASES.DRAW_SELECT;
-    this.state.battleMessage = `ポイント +${recovered}。ターン ${this.state.turn} を開始します。`;
+    const recycleNote = refill.recycleCount
+      ? "捨て札をシャッフルして山札を再構築。"
+      : "";
+    this.state.battleMessage = `ポイント +${recovered}。手札${discarded.length}枚を捨て、${refill.drawn.length}枚を引き直しました。${recycleNote}ターン ${this.state.turn} を開始します。`;
     return true;
   }
 

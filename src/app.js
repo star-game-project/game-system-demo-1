@@ -161,7 +161,7 @@ function renderPreview(state) {
       </div>
       <div class="role-guide">
         <span class="preview-label">ROLE QUICK GUIDE</span>
-        <div class="role-guide__row"><span>同じ目のみ</span><b>×4</b></div>
+        <div class="role-guide__row"><span>同じ目のみ（2枚以上）</span><b>×4</b></div>
         <div class="role-guide__row"><span>偶数 / 奇数のみ</span><b>×1.5</b></div>
         <div class="role-guide__row role-guide__row--risk"><span>1・2・3を含む</span><b>×0.5</b></div>
       </div>
@@ -241,20 +241,22 @@ function renderHand(state) {
 
 function renderCommands(state) {
   const selected = engine.getSelectedCard();
+  const cardsAvailable =
+    state.player.deck.length + state.player.discardPile.length;
   const canDraw =
-    state.player.point >= GAME_CONFIG.DRAW_COST && state.player.deck.length > 0;
+    state.player.point >= GAME_CONFIG.DRAW_COST && cardsAvailable > 0;
   const hasPlayableCard = state.player.hand.some(
     (card) => card.cost <= state.player.point,
   );
 
   if (state.phase === PHASES.DRAW_SELECT) {
-    const disabledReason = !state.player.deck.length
-      ? "デッキが空です"
+    const disabledReason = !cardsAvailable
+      ? "山札・捨て札ともに空です"
       : `ポイントが${GAME_CONFIG.DRAW_COST}必要です`;
     return `
       <div class="command-copy">
         <span class="command-step">01 / 02</span>
-        <div><strong>カードをドローしますか？</strong><small>1ポイントで手札を1枚増やせます</small></div>
+        <div><strong>カードをドローしますか？</strong><small>${GAME_CONFIG.DRAW_COST}ポイントで手札を1枚増やせます / 手札はターン終了時に総入れ替え</small></div>
       </div>
       <div class="command-actions">
         <button class="command-button command-button--secondary" data-action="skip">SKIP</button>
@@ -297,7 +299,7 @@ function renderResult(state) {
         <p>${victory ? `${state.turn}ターンでCPUを撃破しました。` : `CPUの攻撃に敗れました。戦術を組み直しましょう。`}</p>
         <div class="result-stats">
           <span><small>TURN</small><b>${state.turn}</b></span>
-          <span><small>CARDS USED</small><b>${state.player.discardPile.length}</b></span>
+          <span><small>CARDS USED</small><b>${state.player.cardsPlayed}</b></span>
           <span><small>HP LEFT</small><b>${state.player.hp}</b></span>
         </div>
         <button class="command-button command-button--primary" data-action="restart">RESTART BATTLE</button>

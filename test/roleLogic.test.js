@@ -4,13 +4,19 @@ import { evaluateHandRole } from "../src/game/roleLogic.js";
 
 const hand = (...values) => values.map((dieValue, index) => ({ id: `c${index}`, dieValue }));
 
-test("SAME NUMBER takes priority over EVEN and also works with one card", () => {
+test("SAME NUMBER takes priority over EVEN and needs at least two cards", () => {
   assert.deepEqual(evaluateHandRole(hand(2, 2, 2)), {
     roleId: "same_number",
     roleName: "SAME NUMBER",
     multiplier: 4,
   });
-  assert.equal(evaluateHandRole(hand(5)).roleName, "SAME NUMBER");
+  assert.equal(evaluateHandRole(hand(5, 5)).roleName, "SAME NUMBER");
+});
+
+test("a single card never forms SAME NUMBER", () => {
+  assert.equal(evaluateHandRole(hand(5)).roleName, "ODD");
+  assert.equal(evaluateHandRole(hand(6)).roleName, "EVEN");
+  assert.equal(evaluateHandRole(hand(5)).multiplier, 1.5);
 });
 
 test("EVEN and ODD recognize hands containing only their parity", () => {

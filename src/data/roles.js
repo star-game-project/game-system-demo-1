@@ -4,7 +4,8 @@ export const HAND_ROLES = Object.freeze([
     name: "SAME NUMBER",
     multiplier: 4,
     priority: 100,
-    description: "すべて同じ目",
+    minHandSize: 2,
+    description: "2枚以上ですべて同じ目",
   },
   {
     id: "even_only",

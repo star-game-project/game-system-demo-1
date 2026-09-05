@@ -14,7 +14,7 @@ const MIME_TYPES = {
   ".ico": "image/x-icon",
 };
 
-createServer(async (request, response) => {
+const server = createServer(async (request, response) => {
   try {
     const pathname = decodeURIComponent(new URL(request.url, `http://${request.headers.host}`).pathname);
     const requestedPath = normalize(pathname).replace(/^(\.\.[/\\])+/, "");
@@ -34,6 +34,30 @@ createServer(async (request, response) => {
     response.writeHead(404, { "Content-Type": "text/plain; charset=utf-8" });
     response.end("Not found");
   }
-}).listen(PORT, "127.0.0.1", () => {
-  console.log(`DICE HAND is running at http://localhost:${PORT}`);
 });
+
+server.listen(PORT, "127.0.0.1", () => {
+  console.log(`DICE HAND is running at http://localhost:${PORT}`);
+  console.log("Ctrl+C で終了します。");
+});
+
+let shuttingDown = false;
+
+function shutdown(signal) {
+  // 2度目の Ctrl+C は即座に終了する。
+  if (shuttingDown) process.exit(0);
+  shuttingDown = true;
+
+  console.log(`\n${signal} を受信しました。サーバーを終了します…`);
+  server.close(() => process.exit(0));
+
+  // keep-alive 接続が残っていると close() が完了しないため、明示的に切断する。
+  server.closeAllConnections?.();
+
+  // 何らかの理由で閉じきれない場合の保険。
+  setTimeout(() => process.exit(1), 3000).unref();
+}
+
+for (const signal of ["SIGINT", "SIGTERM"]) {
+  process.on(signal, () => shutdown(signal));
+}

@@ -1603,3 +1603,16 @@ a:focus-visible {
   .build-summary__stats { justify-content: space-between; }
   .role-table { position: static; }
 }
+
+.docs-link {
+  color: var(--muted);
+  text-decoration: none;
+  font-size: 10px;
+  letter-spacing: 0.18em;
+  font-weight: 700;
+  border: 1px solid var(--line);
+  padding: 9px 13px;
+  transition: color 160ms ease, border-color 160ms ease;
+}
+
+.docs-link:hover { color: var(--cyan); border-color: var(--cyan); }

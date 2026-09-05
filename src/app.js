@@ -494,6 +494,7 @@ function renderDeckBuild() {
           <span><strong>DICE HAND</strong><small>DECK CONSTRUCTION</small></span>
         </a>
         <div class="topbar__center"><span>DECK</span><strong>${summary.total} / ${DECK_RULES.DECK_SIZE}</strong></div>
+        <a class="docs-link" href="/docs">SPEC</a>
         <button class="command-button command-button--primary" data-action="start-battle" ${valid ? "" : "disabled"}>
           <span>BATTLE START</span><small>${valid ? "READY" : "デッキ未完成"}</small>
         </button>

@@ -19,6 +19,14 @@ export default {
     let response = await env.ASSETS.fetch(request);
 
     if (response.status === 404 && !url.pathname.includes(".")) {
+      // /docs のようなディレクトリは、その index.html を先に探す。
+      const directoryIndex = `${url.pathname.replace(/\/+$/, "")}/index.html`;
+      response = await env.ASSETS.fetch(
+        new Request(new URL(directoryIndex, url), request),
+      );
+    }
+
+    if (response.status === 404 && !url.pathname.includes(".")) {
       response = await env.ASSETS.fetch(
         new Request(new URL("/index.html", url), request),
       );

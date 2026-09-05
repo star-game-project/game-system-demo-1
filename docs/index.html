@@ -1,0 +1,322 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>DICE HAND — 戦闘デモ仕様書</title>
+  <meta name="description" content="ターン制カードバトル DICE HAND 戦闘デモの全仕様" />
+  <link rel="stylesheet" href="/src/styles.css" />
+  <link rel="stylesheet" href="/docs/docs.css" />
+</head>
+<body>
+  <div class="docs-shell">
+    <header class="docs-header">
+      <a class="brand" href="/">
+        <span class="brand__mark"><i>D<small>6</small></i></span>
+        <span><strong>DICE HAND</strong><small>SPECIFICATION</small></span>
+      </a>
+      <a class="docs-back" href="/">← ゲームに戻る</a>
+    </header>
+
+    <p class="docs-lead">
+      ターン制カードバトル「DICE HAND」戦闘デモの全仕様。
+      定数・カード・役の各表は実装（<code>src/data/</code>）から実行時に生成しているため、
+      コードを変更すればこのページも自動的に追従する。
+    </p>
+
+    <nav class="docs-toc" id="toc"></nav>
+
+    <section id="overview">
+      <h2>1. 概要</h2>
+      <p>プレイヤーとCPUが1対1で戦うターン制カードバトル。プレイヤーはデッキからカードを引き、ポイントを消費してカードを使用し、CPUのHPを0にすれば勝利する。</p>
+      <p>本デモは戦闘のコアルールが成立するかを確認することを目的とし、以下2つの画面で構成される。</p>
+      <ul>
+        <li><b>DECK CONSTRUCTION</b> — カード一覧から20枚のデッキを構築する</li>
+        <li><b>BATTLE</b> — 構築したデッキでCPUと戦う</li>
+      </ul>
+      <p>戦闘は必ずデッキ構築から始まる。戦闘中はいつでも構築画面に戻れる（デッキ内容は保持される）。</p>
+
+      <h3>本デモに含まれないもの</h3>
+      <p>オンライン対戦、セーブ、アカウント、カード収集、ショップ、ストーリー、CPU側のカードシステム、高度なCPU思考、BGM・設定画面。</p>
+    </section>
+
+    <section id="constants">
+      <h2>2. ゲーム定数</h2>
+      <p>すべて <code>src/data/constants.js</code> の <code>GAME_CONFIG</code> で管理し、後から変更できる。</p>
+      <div class="docs-table-wrap"><table id="constants-table"></table></div>
+      <p class="docs-note">CPU HP・CPU攻撃力・プレイヤーHPは、貪欲AIによる400回の戦闘シミュレーション（平均43.4ダメージ/ターン）に基づき、勝率76%・平均8.5ターンになるよう設定している。</p>
+    </section>
+
+    <section id="deck-build">
+      <h2>3. デッキ構築</h2>
+      <p>カード一覧から <code>+</code> / <code>−</code> で枚数を増減し、ちょうど20枚にすると <b>BATTLE START</b> が有効になる。</p>
+
+      <h3>3.1 構築ルール</h3>
+      <div class="docs-table-wrap"><table id="deck-rules-table"></table></div>
+
+      <h3>3.2 目の上限が持つ意味</h3>
+      <p>「同じ目は最大4枚」は単一の目に寄せたデッキを防ぐための制約である。これがないと、同じ目だけを積んで <b>SAME NUMBER ×4</b> を毎ターン成立させる構築が自明の最適解になってしまう。</p>
+      <p>この制約により、<b>20枚のデッキには必ず5種類以上の目が混ざる</b>ことが構造的に保証される。4種類だけでは <code>4種 × 4枚 + ワイルド2枚 = 18枚</code> にしか届かないためである。目が散ることは STRAIGHT 系や FULL HOUSE の成立条件でもあるため、この制約は役システムの前提にもなっている。</p>
+
+      <h3>3.3 検証</h3>
+      <p>デッキが不正な場合は理由を画面に表示し、BATTLE START を無効化する。検証内容は次のとおり。</p>
+      <ul>
+        <li>合計がちょうど20枚であること</li>
+        <li>攻撃カードが1枚以上あること</li>
+        <li>各目の枚数が上限以下であること</li>
+        <li>同名カードの枚数が上限以下であること</li>
+      </ul>
+
+      <h3>3.4 初期デッキ（おすすめ構成）</h3>
+      <div class="docs-table-wrap"><table id="default-deck-table"></table></div>
+    </section>
+
+    <section id="cards">
+      <h2>4. カード</h2>
+
+      <h3>4.1 データ構造</h3>
+      <pre><code>type Card = {
+  id: string;              // 実体ごとの一意なID
+  key: string;             // カタログ上の種別キー
+  name: string;
+
+  cost: number;            // 使用に必要なポイント
+  attack: number;          // 基本攻撃力（戦術カードは 0）
+
+  dieValue: 1|2|3|4|5|6;   // 現在の目（Tune Up / Tune Down で変化する）
+  baseDieValue: 1|2|3|4|5|6; // 初期の目（変化の表示に使う）
+
+  onUseAbility: Ability | null;      // 攻撃時に発動
+  passiveAbility: Ability | null;    // 手札にある間つねに有効
+  tacticalAbility: Ability | null;   // 攻撃せず手札を操作する
+};</code></pre>
+      <p>役はカード固有ではなく手札全体から判定するため、カード側に役データは持たせない。能力はすべてデータとして定義し、カード名ごとの分岐は書かない。</p>
+
+      <h3>4.2 カード一覧</h3>
+      <div class="docs-table-wrap"><table id="catalogue-table"></table></div>
+    </section>
+
+    <section id="flow">
+      <h2>5. 戦闘フロー</h2>
+
+      <h3>5.1 戦闘開始</h3>
+      <ol>
+        <li>プレイヤーHP・CPU HPを最大値にする</li>
+        <li>ポイントを初期値にする</li>
+        <li>構築した20枚のデッキを生成しシャッフルする</li>
+        <li>デッキから5枚引く（ポイントを消費しない）</li>
+        <li>ターン1を開始する</li>
+      </ol>
+
+      <h3>5.2 1ターンの進行</h3>
+      <pre><code>1. ドロー選択      DRAW（1ポイント）または SKIP
+2. カード選択      戦術カードは何枚でも使用可（ターンは終了しない）
+3. 攻撃            攻撃カードを1枚使用 → ターン終了
+4. CPUの攻撃
+5. ポイント回復
+6. 手札を全て捨て、5枚引き直す
+7. 次のターンへ</code></pre>
+      <p>どちらかのHPが0以下になった時点で戦闘を終了する。</p>
+
+      <h3>5.3 フェーズ</h3>
+      <div class="docs-table-wrap"><table id="phases-table"></table></div>
+    </section>
+
+    <section id="resources">
+      <h2>6. リソース</h2>
+
+      <h3>6.1 ポイント</h3>
+      <p>カードの使用とドローに必要。ターン終了時に回復し、最大値を超えない。0未満にもならない。</p>
+      <pre><code>point = Math.min(maxPoint, point + TURN_POINT_RECOVERY)</code></pre>
+      <p>1ターンの消費が回復量を上回りうるのは戦術カードを複数枚使った場合であり、これによりポイントが実際の制約として機能する。</p>
+
+      <h3>6.2 ドロー</h3>
+      <p>ターン開始時に DRAW / SKIP を選ぶ。DRAW は1ポイントを消費して手札を1枚増やす。以下の場合は DRAW できない。</p>
+      <ul>
+        <li>ポイントが不足している</li>
+        <li>山札と捨て札の両方が空である</li>
+      </ul>
+
+      <h3>6.3 山札・捨て札・再構築</h3>
+      <p>カードは常に「山札・手札・捨て札」のいずれかにあり、3つの合計は常にデッキ枚数（20枚）に等しい。</p>
+      <pre><code>deck.length + hand.length + discardPile.length === DECK_SIZE</code></pre>
+      <p>山札が尽きた状態でカードを引く必要が生じた場合、<b>捨て札をシャッフルして山札を再構築</b>し、続きを引く。山札・捨て札の両方が空になった時点で打ち切る。</p>
+
+      <h3>6.4 手札の総入れ替え</h3>
+      <p>ターン終了時に<b>手札をすべて捨て札へ送り、あらためて5枚引き直す</b>。引き直しはポイントを消費しない。</p>
+      <p>これは「手札を1枚まで減らして SAME NUMBER を常に成立させる」退化戦術を防ぐための仕様である。毎ターン5〜6枚を消費するため、山札はおよそ4ターンで一巡する。</p>
+    </section>
+
+    <section id="roles">
+      <h2>7. 役システム</h2>
+      <p>カードを使用する直前の<b>手札全体</b>の目を見て役を判定し、攻撃力に倍率を掛ける。使用するカード自身も判定に含める（手札から取り除く前に判定する）。</p>
+
+      <h3>7.1 役一覧</h3>
+      <div class="docs-table-wrap"><table id="roles-table"></table></div>
+      <p class="docs-note">頻度は、目の上限4枚を満たす代表的な20枚デッキから5枚を引いた場合の実測値（20万回試行）。有利な役の成立率は合計85.7%、期待倍率は1.43。</p>
+
+      <h3>7.2 判定順</h3>
+      <p>役は重複させず、<b>ひとつだけ</b>を適用する。倍率を掛け合わせることはしない。</p>
+      <ol>
+        <li>減算役（<code>kind: "penalty"</code>）を先に判定する。成立すればそれを適用して終了する。</li>
+        <li>成立しなければ通常役（<code>kind: "bonus"</code>）を倍率の高い順に判定し、最初に成立したものを適用する。</li>
+        <li>いずれも成立しなければ倍率 ×1 とする。</li>
+      </ol>
+      <p>倍率が同じ役が並んだ場合は <code>priority</code> の高い方を採用する。</p>
+
+      <h3>7.3 減算役 1-2-3 と、その脱出</h3>
+      <p>1・2・3 が揃うと ×0.5 になる。これは通常役より先に判定されるため、ペアなどが成立していても減算が優先される。</p>
+      <p>ただし<b>手札に4があれば 1-2-3 は成立しない</b>。1・2・3 は3連番そのものであり、この例外がないと THREE STRAIGHT に必ず吸収されて減算役が機能しなくなるためである。</p>
+      <pre><code>1, 2, 3, 5, 6  →  1-2-3        ×0.5   （罠）
+1, 2, 3, 4, 6  →  FOUR STRAIGHT ×1.7   （4を作って脱出）
+1, 2, 3, 4, 5  →  FIVE STRAIGHT ×2.4</code></pre>
+      <p>これにより、Tune Up で4を作る、Recycle で1か2を捨てるといった対処が意味を持つ。</p>
+
+      <h3>7.4 ワイルド</h3>
+      <p>Wild Die は役判定において任意の目として扱われる。実装はワイルドに割り当てうる目の全組み合わせを評価し、<b>最も倍率が高くなる解釈</b>を採用する。</p>
+      <p>この方式により、ワイルドが自分から減算役を成立させることはない（より高い倍率の解釈が選ばれるため）。また 1・2・3 が揃っている手札でも、ワイルドが4になることで STRAIGHT として脱出できる。</p>
+
+      <h3>7.5 手札枚数の条件</h3>
+      <p>手札全体を条件とする役（SAME NUMBER / EVEN / ODD）には最低枚数がある。1枚だけの手札が自動的に成立してしまうことを防ぐためで、<code>minHandSize</code> としてデータに持たせている。</p>
+    </section>
+
+    <section id="abilities">
+      <h2>8. 能力</h2>
+      <p>能力はすべて <code>{ type, value?, duration? }</code> 形式のデータとして定義する。</p>
+
+      <h3>8.1 使用時能力（onUseAbility）</h3>
+      <p>攻撃カードを使用した瞬間に発動する。</p>
+      <div class="docs-table-wrap"><table id="onuse-table"></table></div>
+
+      <h3>8.2 常在能力（passiveAbility）</h3>
+      <p>カードが手札にある間つねに有効。手札の構成が変化するたびに再計算する。</p>
+      <div class="docs-table-wrap"><table id="passive-table"></table></div>
+      <p>手札には明確な順番があり、UI上も左から右へその順で表示する。<code>RIGHT_CARD_ATTACK_BONUS</code> はこの並び順に依存するため、Reorder で並びを操作できる。</p>
+
+      <h3>8.3 戦術能力（tacticalAbility）</h3>
+      <p>戦術カードは<b>攻撃せず、ターンも終了しない</b>。ポイントが続く限り同一ターン中に何枚でも使用できる。</p>
+      <div class="docs-table-wrap"><table id="tactical-table"></table></div>
+
+      <h4>なぜ独立したカテゴリなのか</h4>
+      <p>役はカード使用の直前に判定されるため、使用時能力として目を変更しても、その攻撃の倍率には反映されない。さらに手札はターン終了時に総入れ替えされるため、次ターンにも残らない。目を操作する能力は「攻撃する前に、ターンを終了せずに」使えなければ効果が届く先がない。</p>
+
+      <h4>目の変更の永続性</h4>
+      <p>Tune Up / Tune Down / Overclock による目の変更は<b>その戦闘の間ずっと残る</b>。<code>baseDieValue</code> と比較して変化を検出し、UI上は <code>TUNED 2→1</code> のように表示する。手札が毎ターン捨てられる仕様上、1ターン限りの効果ではコストに見合わないためである。山札は約4ターンで一巡するので、変更したカードは戦闘中に再び手札へ戻る。</p>
+      <p>目は1〜6の範囲に収める（範囲外にはならず、上限・下限で止まる）。</p>
+
+      <h3>8.4 一時効果（temporaryEffects）</h3>
+      <p>使用時能力などで発生した一時的な効果を配列で管理し、有効ターンを過ぎたら取り除く。</p>
+      <pre><code>{
+  type: "ATTACK_BONUS",
+  value: 5,
+  activeFromTurn: 3,
+  expiresAfterTurn: 3,
+  source: "Boost 2"
+}</code></pre>
+    </section>
+
+    <section id="damage">
+      <h2>9. ダメージ計算</h2>
+      <p>加算をすべて済ませてから役倍率を掛ける。したがって倍率は常在・一時効果の分も増幅する。</p>
+      <pre><code>FinalAttack = Math.round(
+  ( BaseAttack + PassiveBonus + TemporaryBonus ) × HandRoleMultiplier
+)</code></pre>
+
+      <h3>9.1 計算例</h3>
+      <pre><code>Base Attack     10
+Passive Bonus   +5   （左隣の Support 3 による）
+Temporary Bonus +5   （前ターンの Boost 2 による）
+手札            1 / 3 / 5  →  ODD ×2.8
+
+(10 + 5 + 5) × 2.8 = 56 ダメージ</code></pre>
+
+      <h3>9.2 カード使用時の処理順</h3>
+      <pre><code>1.  使用可能か確認（コスト ≤ 現在ポイント）
+2.  使用前の手札で役を判定
+3.  常在能力を確認
+4.  一時効果を確認
+5.  最終攻撃力を計算
+6.  ポイントをコスト分消費
+7.  使用時能力を発動
+8.  CPUへダメージ
+9.  使用カードを手札から取り除く
+10. 捨て札へ移動
+11. 常在能力・役を再計算
+12. 勝敗判定</code></pre>
+      <p>役判定は必ずカードを手札から取り除く前に行う。</p>
+    </section>
+
+    <section id="cpu">
+      <h2>10. CPU</h2>
+      <p>本デモのCPUはカードを使用せず、毎ターン固定ダメージで攻撃するのみ。</p>
+      <pre><code>player.hp = Math.max(0, player.hp - CPU_ATTACK_DAMAGE)</code></pre>
+      <p>CPUの状態はHPと最大HPのみを持つ。</p>
+    </section>
+
+    <section id="result">
+      <h2>11. 勝敗</h2>
+      <ul>
+        <li>プレイヤーの攻撃後にCPU HPが0以下 → <b>YOU WIN</b>（CPUターンへ進まず終了）</li>
+        <li>CPUの攻撃後にプレイヤーHPが0以下 → <b>GAME OVER</b></li>
+      </ul>
+      <p>HPは0未満にならない。戦闘終了後は操作できず、<b>REMATCH</b>（同じデッキで再戦）または <b>EDIT DECK</b>（構築に戻る）を選ぶ。</p>
+    </section>
+
+    <section id="state">
+      <h2>12. 状態</h2>
+      <pre><code>type GameState = {
+  turn: number;
+  phase: GamePhase;
+
+  player: {
+    hp: number; maxHp: number;
+    point: number; maxPoint: number;
+    deck: Card[]; hand: Card[]; discardPile: Card[];
+    cardsPlayed: number;          // 実際に使用した枚数（捨て札枚数とは別）
+    temporaryEffects: TemporaryEffect[];
+  };
+
+  cpu: { hp: number; maxHp: number };
+
+  selectedCardId: string | null;
+  currentRole: HandRoleResult | null;
+  lastAttack: AttackResult | null;
+  battleMessage: string;
+};</code></pre>
+      <p>手札は毎ターン捨て札を経由するため、捨て札の枚数は「使用したカードの枚数」と一致しない。使用枚数は <code>cardsPlayed</code> で別に数える。</p>
+    </section>
+
+    <section id="architecture">
+      <h2>13. 構成</h2>
+      <p>UI・ゲーム進行・データを分離し、ロジックはUIから独立してテストできるようにする。</p>
+      <pre><code>src/
+  app.js              画面描画とイベント（唯一のUI層）
+  styles.css
+
+  data/
+    constants.js      ゲーム定数・デッキ構築ルール・フェーズ
+    cards.js          カード一覧とデッキ生成
+    roles.js          役の定義
+
+  game/
+    gameState.js      初期状態の生成
+    battleEngine.js   ターン進行・カード使用・勝敗
+    deckLogic.js      シャッフル・ドロー・山札再構築
+    deckBuilder.js    デッキ構築ルールと検証
+    roleLogic.js      役判定
+    damageLogic.js    攻撃力計算
+    abilityLogic.js   能力の解決
+
+docs/                 このページ
+test/                 node:test によるユニットテスト</code></pre>
+      <p>テストは <code>npm test</code> で実行する。</p>
+    </section>
+
+    <footer class="docs-footer">
+      <p>この仕様書の定数・カード・役の各表は <code>src/data/</code> から実行時に生成している。</p>
+    </footer>
+  </div>
+
+  <script type="module" src="/docs/docs.js"></script>
+</body>
+</html>

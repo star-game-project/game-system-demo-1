@@ -1,0 +1,172 @@
+/* 仕様書ページ。配色トークンは src/styles.css の :root を利用する。 */
+
+.docs-shell {
+  max-width: 940px;
+  margin: 0 auto;
+  padding: 26px 24px 90px;
+  line-height: 1.85;
+  font-size: 14px;
+}
+
+.docs-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding-bottom: 18px;
+  border-bottom: 1px solid var(--line);
+  margin-bottom: 26px;
+}
+
+.docs-back {
+  color: var(--muted);
+  text-decoration: none;
+  font-size: 12px;
+  letter-spacing: 0.06em;
+  border: 1px solid var(--line);
+  padding: 8px 14px;
+  transition: color 160ms ease, border-color 160ms ease;
+}
+
+.docs-back:hover { color: var(--cyan); border-color: var(--cyan); }
+
+.docs-lead {
+  color: var(--muted);
+  border-left: 2px solid var(--cyan);
+  padding-left: 16px;
+  margin: 0 0 26px;
+}
+
+.docs-toc {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(206px, 1fr));
+  gap: 2px 14px;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  padding: 16px 18px;
+  margin-bottom: 40px;
+}
+
+.docs-toc a {
+  color: var(--muted);
+  text-decoration: none;
+  font-size: 12px;
+  padding: 3px 0;
+}
+
+.docs-toc a:hover { color: var(--cyan); }
+
+.docs-shell section { margin-bottom: 46px; scroll-margin-top: 18px; }
+
+.docs-shell h2 {
+  font-size: 20px;
+  margin: 0 0 16px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--line);
+  letter-spacing: 0.02em;
+}
+
+.docs-shell h3 {
+  font-size: 15px;
+  margin: 30px 0 10px;
+  color: var(--cyan);
+  letter-spacing: 0.02em;
+}
+
+.docs-shell h4 {
+  font-size: 13px;
+  margin: 22px 0 8px;
+  color: var(--text);
+}
+
+.docs-shell p { margin: 0 0 13px; }
+.docs-shell ul, .docs-shell ol { margin: 0 0 13px; padding-left: 22px; }
+.docs-shell li { margin-bottom: 5px; }
+.docs-shell b { color: var(--text); font-weight: 700; }
+
+.docs-shell code {
+  font-family: "SF Mono", ui-monospace, Menlo, Consolas, monospace;
+  font-size: 0.9em;
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+  padding: 1px 5px;
+  color: #cfe0ff;
+}
+
+.docs-shell pre {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-left: 2px solid var(--blue);
+  padding: 15px 18px;
+  overflow-x: auto;
+  margin: 0 0 15px;
+}
+
+.docs-shell pre code {
+  background: none;
+  border: none;
+  padding: 0;
+  color: #d5e2fb;
+  font-size: 12px;
+  line-height: 1.75;
+}
+
+.docs-note {
+  color: var(--muted);
+  font-size: 12px;
+  border-left: 2px solid var(--line);
+  padding-left: 13px;
+}
+
+.docs-table-wrap {
+  overflow-x: auto;
+  border: 1px solid var(--line);
+  margin-bottom: 15px;
+}
+
+.docs-shell table {
+  border-collapse: collapse;
+  width: 100%;
+  min-width: 420px;
+  font-size: 12.5px;
+}
+
+.docs-shell th {
+  text-align: left;
+  background: var(--surface-2);
+  color: var(--muted);
+  font-size: 10px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  padding: 10px 14px;
+  white-space: nowrap;
+  border-bottom: 1px solid var(--line);
+}
+
+.docs-shell td {
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--line);
+  vertical-align: top;
+}
+
+.docs-shell tbody tr:last-child td { border-bottom: none; }
+.docs-shell tbody tr:hover { background: rgba(191, 210, 255, 0.035); }
+.docs-shell small { color: var(--muted); font-size: 10px; }
+
+.doc-die { font-size: 16px; color: var(--cyan); }
+.doc-die--wild { color: #ff9de0; }
+
+.is-bonus { color: var(--cyan); }
+.is-risk { color: var(--danger); }
+
+.docs-footer {
+  border-top: 1px solid var(--line);
+  padding-top: 18px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+@media (max-width: 700px) {
+  .docs-shell { padding: 20px 16px 70px; }
+  .docs-toc { grid-template-columns: 1fr; }
+}

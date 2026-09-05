@@ -159,6 +159,16 @@ export class BattleEngine {
       return `${card.name} — ${names[0]} と ${names[1]} の位置を入れ替えました。`;
     }
 
+    if (ability.type === "GAIN_SHIELD") {
+      player.shield += ability.value;
+      return `${card.name} — シールド +${ability.value}（現在 ${player.shield}）。`;
+    }
+
+    if (ability.type === "GRANT_EXTRA_ATTACK") {
+      player.extraAttacks += ability.value;
+      return `${card.name} — このターン、あと${player.extraAttacks + 1}回攻撃できます。`;
+    }
+
     if (ability.type === "REDRAW_CARD") {
       const discardedName = nameOf(targets[0]);
       const discarded = player.hand.find((item) => item.id === targets[0]);
@@ -201,22 +211,43 @@ export class BattleEngine {
     this.state.currentRole = evaluateHandRole(this.state.player.hand);
     this.state.lastAttack = { ...attack, cardName: card.name };
     this.state.selectedCardId = null;
-    this.state.battleMessage = `${card.name} — ${attack.finalAttack}ダメージ！`;
-    this.state.phase =
-      this.state.cpu.hp <= 0 ? PHASES.VICTORY : PHASES.PLAYER_ATTACK;
 
+    if (this.state.cpu.hp <= 0) {
+      this.state.battleMessage = `${card.name} — ${attack.finalAttack}ダメージ！`;
+      this.state.phase = PHASES.VICTORY;
+      return attack;
+    }
+
+    // 追加攻撃が残っている間はターンを終了せず、カード選択に留まる。
+    if (this.state.player.extraAttacks > 0) {
+      this.state.player.extraAttacks -= 1;
+      this.state.battleMessage = `${card.name} — ${attack.finalAttack}ダメージ！ 続けてあと${this.state.player.extraAttacks + 1}回攻撃できます。`;
+      this.state.phase = PHASES.CARD_SELECT;
+      return attack;
+    }
+
+    this.state.battleMessage = `${card.name} — ${attack.finalAttack}ダメージ！`;
+    this.state.phase = PHASES.PLAYER_ATTACK;
     return attack;
   }
 
   startCpuTurn() {
     if (this.state.phase !== PHASES.PLAYER_ATTACK) return false;
     this.state.phase = PHASES.CPU_ATTACK;
-    this.state.player.hp = Math.max(
-      0,
-      this.state.player.hp - GAME_CONFIG.CPU_ATTACK_DAMAGE,
-    );
-    this.state.battleMessage = `CPUの反撃。${GAME_CONFIG.CPU_ATTACK_DAMAGE}ダメージを受けました。`;
-    if (this.state.player.hp <= 0) this.state.phase = PHASES.DEFEAT;
+
+    const { player } = this.state;
+    const incoming = GAME_CONFIG.CPU_ATTACK_DAMAGE;
+    const absorbed = Math.min(player.shield, incoming);
+    const taken = incoming - absorbed;
+
+    player.shield -= absorbed;
+    player.hp = Math.max(0, player.hp - taken);
+    this.state.lastCpuAttack = { incoming, absorbed, taken };
+
+    this.state.battleMessage = absorbed
+      ? `CPUの反撃。シールドが${absorbed}吸収し、${taken}ダメージを受けました。`
+      : `CPUの反撃。${incoming}ダメージを受けました。`;
+    if (player.hp <= 0) this.state.phase = PHASES.DEFEAT;
     return true;
   }
 
@@ -234,6 +265,10 @@ export class BattleEngine {
       this.state.player.temporaryEffects,
       this.state.turn,
     );
+
+    // シールドと追加攻撃はターンをまたがない。
+    this.state.player.shield = 0;
+    this.state.player.extraAttacks = 0;
 
     // 手札はターン終了時にすべて捨て札へ送り、新しい手札を引き直す。
     const discarded = this.discardHand();

@@ -1,6 +1,6 @@
 export const GAME_CONFIG = Object.freeze({
   PLAYER_MAX_HP: 120,
-  CPU_MAX_HP: 360,
+  CPU_MAX_HP: 560,
   START_POINT: 10,
   MAX_POINT: 10,
   TURN_POINT_RECOVERY: 5,

@@ -11,6 +11,7 @@ export function calculateAttack(card, hand, playerState, turn) {
     baseAttack: card.attack,
     passiveBonus,
     temporaryBonus,
+    roles: role.roles,
     roleId: role.roleId,
     roleName: role.roleName,
     roleMultiplier: role.multiplier,

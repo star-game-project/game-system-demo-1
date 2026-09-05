@@ -1616,3 +1616,23 @@ a:focus-visible {
 }
 
 .docs-link:hover { color: var(--cyan); border-color: var(--cyan); }
+
+.buff-chip--shield {
+  color: #9fd4ff;
+  border-color: color-mix(in srgb, #9fd4ff 45%, transparent);
+  background: color-mix(in srgb, #9fd4ff 12%, transparent);
+}
+
+.buff-chip--extra {
+  color: var(--amber);
+  border-color: color-mix(in srgb, var(--amber) 45%, transparent);
+  background: color-mix(in srgb, var(--amber) 12%, transparent);
+}
+
+.role-breakdown {
+  display: block;
+  margin-top: 3px;
+  color: var(--muted);
+  font-size: 10px;
+  letter-spacing: 0.08em;
+}

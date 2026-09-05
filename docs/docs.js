@@ -13,9 +13,13 @@ import {
   CARD_BY_KEY,
   DEFAULT_DECK_COUNTS,
 } from "/src/data/cards.js";
-import { BONUS_ROLES, PENALTY_ROLES } from "/src/data/roles.js";
+import { BONUS_ROLES, PENALTY_ROLES, ROLE_FAMILIES } from "/src/data/roles.js";
 import { summarizeDeck, bucketLimit } from "/src/game/deckBuilder.js";
-import { isTacticalCard, isWildCard } from "/src/game/abilityLogic.js";
+import {
+  TACTICAL_ABILITIES,
+  isTacticalCard,
+  isWildCard,
+} from "/src/game/abilityLogic.js";
 
 const DIE_FACES = ["", "⚀", "⚁", "⚂", "⚃", "⚄", "⚅"];
 
@@ -106,6 +110,12 @@ function tacticalText(ability) {
   if (ability.type === "REDRAW_CARD") {
     return "対象1枚を捨て、山札から1枚引く";
   }
+  if (ability.type === "GAIN_SHIELD") {
+    return `シールドを ${ability.value} 得る（次のCPU攻撃を吸収）`;
+  }
+  if (ability.type === "GRANT_EXTRA_ATTACK") {
+    return `このターン、攻撃回数を ${ability.value} 増やす`;
+  }
   return ability.type;
 }
 
@@ -187,14 +197,32 @@ table(
 );
 
 // ---- 7.1 役一覧 ----
+const FAMILY_LABELS = {
+  set: "同じ目",
+  straight: "連番",
+  parity: "偶奇",
+  penalty: "減算",
+};
+
 table(
   document.querySelector("#roles-table"),
-  ["役", "条件", "倍率", "頻度"],
+  ["役", "系統", "条件", "倍率", "単独成立率"],
   [...BONUS_ROLES, ...PENALTY_ROLES].map((role) => [
     `<b>${role.name}</b>${role.minHandSize ? `<br /><small>最低${role.minHandSize}枚</small>` : ""}`,
+    FAMILY_LABELS[role.family] ?? role.family,
     role.description,
     `<b class="${role.kind === "penalty" ? "is-risk" : "is-bonus"}">${multiplierLabel(role.multiplier)}</b>`,
     MEASURED_FREQUENCY[role.id] ?? "—",
+  ]),
+);
+
+// 系統一覧
+table(
+  document.querySelector("#families-table"),
+  ["系統", "含まれる役（倍率の高い順）"],
+  ROLE_FAMILIES.map(({ family, roles }) => [
+    `<b>${FAMILY_LABELS[family] ?? family}</b><br /><small><code>${family}</code></small>`,
+    roles.map((role) => `${role.name} ${multiplierLabel(role.multiplier)}`).join(" ＞ "),
   ]),
 );
 
@@ -246,7 +274,7 @@ table(
   ["type", "対象数", "効果", "持つカード"],
   [...tacticalTypes.entries()].map(([type, cards]) => [
     `<code>${type}</code>`,
-    type === "HAND_POSITION_SWAP" ? "2" : "1",
+    `${TACTICAL_ABILITIES[type]?.targetCount ?? 1}`,
     cards.map((card) => tacticalText(card.tacticalAbility)).join("<br />"),
     cards.map((card) => `${card.name}（Cost ${card.cost}）`).join("<br />"),
   ]),

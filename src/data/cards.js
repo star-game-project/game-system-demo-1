@@ -148,6 +148,26 @@ const CARD_CATALOGUE = Object.freeze([
     tacticalAbility: { type: "DIE_VALUE_SHIFT", value: 2 },
   },
   {
+    key: "guard",
+    name: "Guard",
+    cost: 2,
+    attack: 0,
+    dieValue: 5,
+    onUseAbility: null,
+    passiveAbility: null,
+    tacticalAbility: { type: "GAIN_SHIELD", value: 14 },
+  },
+  {
+    key: "double_tap",
+    name: "Double Tap",
+    cost: 3,
+    attack: 0,
+    dieValue: 1,
+    onUseAbility: null,
+    passiveAbility: null,
+    tacticalAbility: { type: "GRANT_EXTRA_ATTACK", value: 1 },
+  },
+  {
     key: "reorder",
     name: "Reorder",
     cost: 1,
@@ -175,9 +195,9 @@ export const CARD_BY_KEY = Object.freeze(
 
 /** 目の上限を守った初期デッキ（合計20枚）。 */
 export const DEFAULT_DECK_COUNTS = Object.freeze({
-  strike_1: 2,
+  strike_1: 1,
   pierce_1: 2,
-  jab_2: 1,
+  double_tap: 1,
   boost_2: 2,
   reorder: 1,
   support_3: 1,
@@ -187,6 +207,7 @@ export const DEFAULT_DECK_COUNTS = Object.freeze({
   tune_up: 1,
   heavy_5: 2,
   recycle: 1,
+  guard: 1,
   heavy_6: 2,
   wild_die: 1,
 });

@@ -19,6 +19,8 @@ export function createInitialGameState(random = Math.random, deckCards = null) {
       hand: openingDraw.drawn,
       discardPile: [],
       cardsPlayed: 0,
+      shield: 0,
+      extraAttacks: 0,
       temporaryEffects: [],
     },
     cpu: {

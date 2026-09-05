@@ -67,11 +67,16 @@ test("used card is included in role check and then moves to discard", () => {
   engine.selectCard("die_3");
   const result = engine.useSelectedCard();
 
-  assert.equal(result.roleName, "1-2-3");
-  assert.equal(result.finalAttack, 5);
+  // 1,2,3 は3連番かつ減算役。両方が掛かって 1.3 × 0.5 = 0.65。
+  assert.deepEqual(
+    result.roles.map((role) => role.id),
+    ["three_straight", "one_two_three"],
+  );
+  assert.equal(result.roleMultiplier, 0.65);
+  assert.equal(result.finalAttack, Math.round(10 * 0.65));
   assert.equal(engine.state.player.hand.length, 2);
   assert.equal(engine.state.player.discardPile.at(-1).id, "die_3");
-  assert.equal(engine.state.cpu.hp, GAME_CONFIG.CPU_MAX_HP - 5);
+  assert.equal(engine.state.cpu.hp, GAME_CONFIG.CPU_MAX_HP - result.finalAttack);
 });
 
 test("CPU attacks, points recover with a max of ten, and turn advances", () => {
@@ -293,4 +298,82 @@ test("a hand of only tactical cards allows ending the turn", () => {
   assert.equal(engine.hasPlayableAttackCard(), false);
   assert.equal(engine.endTurnWithoutCard(), true);
   assert.equal(engine.state.phase, PHASES.PLAYER_ATTACK);
+});
+
+const shieldCard = (id = "guard") =>
+  card(id, 5, { attack: 0, cost: 2, tacticalAbility: { type: "GAIN_SHIELD", value: 14 } });
+const doubleTapCard = (id = "double") =>
+  card(id, 1, { attack: 0, cost: 3, tacticalAbility: { type: "GRANT_EXTRA_ATTACK", value: 1 } });
+
+test("a zero-target tactical card resolves without needing a target", () => {
+  const engine = engineWithHand([shieldCard(), card("a", 4), card("b", 4)]);
+  const pointBefore = engine.state.player.point;
+
+  assert.ok(engine.playTacticalCard("guard", []));
+  assert.equal(engine.state.player.shield, 14);
+  assert.equal(engine.state.player.point, pointBefore - 2);
+  assert.equal(engine.state.phase, PHASES.CARD_SELECT);
+});
+
+test("shield absorbs the CPU attack before HP is touched", () => {
+  const engine = engineWithHand([shieldCard(), card("a", 4), card("b", 4)]);
+  engine.playTacticalCard("guard", []);
+  engine.state.phase = PHASES.PLAYER_ATTACK;
+  const hpBefore = engine.state.player.hp;
+
+  engine.startCpuTurn();
+
+  const absorbed = Math.min(14, GAME_CONFIG.CPU_ATTACK_DAMAGE);
+  assert.equal(engine.state.player.hp, hpBefore - (GAME_CONFIG.CPU_ATTACK_DAMAGE - absorbed));
+  assert.equal(engine.state.player.shield, 14 - absorbed);
+  assert.match(engine.state.battleMessage, /シールド/);
+});
+
+test("leftover shield does not carry into the next turn", () => {
+  const engine = engineWithHand([shieldCard(), card("a", 4), card("b", 4)]);
+  engine.playTacticalCard("guard", []);
+  engine.state.phase = PHASES.PLAYER_ATTACK;
+  engine.startCpuTurn();
+  engine.finishTurn();
+
+  assert.equal(engine.state.player.shield, 0);
+});
+
+test("an extra attack keeps the turn open for a second card", () => {
+  const engine = engineWithHand([doubleTapCard(), card("a", 4), card("b", 4)]);
+  engine.playTacticalCard("double", []);
+  assert.equal(engine.state.player.extraAttacks, 1);
+
+  engine.selectCard("a");
+  engine.useSelectedCard();
+  // 1回目の攻撃ではターンが終わらない。
+  assert.equal(engine.state.phase, PHASES.CARD_SELECT);
+  assert.equal(engine.state.player.extraAttacks, 0);
+
+  engine.selectCard("b");
+  engine.useSelectedCard();
+  // 2回目でターンが終わる。
+  assert.equal(engine.state.phase, PHASES.PLAYER_ATTACK);
+  assert.equal(engine.state.player.cardsPlayed, 3);
+});
+
+test("an extra attack still ends the battle the moment the CPU dies", () => {
+  const engine = engineWithHand([doubleTapCard(), card("a", 4), card("b", 4)]);
+  engine.playTacticalCard("double", []);
+  engine.state.cpu.hp = 1;
+
+  engine.selectCard("a");
+  engine.useSelectedCard();
+
+  assert.equal(engine.state.phase, PHASES.VICTORY);
+});
+
+test("unused extra attacks do not carry into the next turn", () => {
+  const engine = engineWithHand([doubleTapCard(), card("a", 4), card("b", 4)]);
+  engine.playTacticalCard("double", []);
+  engine.state.phase = PHASES.PLAYER_ATTACK;
+  engine.startCpuTurn();
+  engine.finishTurn();
+
+  assert.equal(engine.state.player.extraAttacks, 0);
 });

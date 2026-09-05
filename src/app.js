@@ -59,6 +59,8 @@ function tacticalLabel(ability) {
   }
   if (ability.type === "HAND_POSITION_SWAP") return "2枚の位置を入替";
   if (ability.type === "REDRAW_CARD") return "1枚捨てて引く";
+  if (ability.type === "GAIN_SHIELD") return `シールド +${ability.value}`;
+  if (ability.type === "GRANT_EXTRA_ATTACK") return "このターン追加で1回攻撃";
   return "TACTICAL";
 }
 
@@ -80,7 +82,19 @@ function hpPercent(current, max) {
 }
 
 function multiplierLabel(value) {
-  return Number.isInteger(value) ? `×${value}` : `×${value.toFixed(1)}`;
+  return Number.isInteger(value) ? `×${value}` : `×${value.toFixed(2)}`;
+}
+
+/** 成立している役の名前。複数成立していれば「A × B」と並べる。 */
+function roleNameLabel(role) {
+  if (!role?.roles?.length) return role?.roleName || null;
+  return role.roles.map((entry) => entry.name).join(" × ");
+}
+
+/** 倍率の内訳。複数成立時のみ「2.8 × 2.8」を返す。 */
+function roleBreakdown(role) {
+  if (!role?.roles || role.roles.length < 2) return "";
+  return role.roles.map((entry) => entry.multiplier).join(" × ");
 }
 
 function abilityLabel(card) {
@@ -131,7 +145,7 @@ function getCenterDisplay(state) {
       };
     }
     return {
-      kicker: attack?.roleName || "DIRECT HIT",
+      kicker: roleNameLabel(attack) || "DIRECT HIT",
       multiplier: attack?.roleName ? multiplierLabel(attack.roleMultiplier) : "",
       value: attack ? `${attack.finalAttack}` : "0",
       unit: "DAMAGE",
@@ -151,7 +165,7 @@ function getCenterDisplay(state) {
 
   const role = state.currentRole;
   return {
-    kicker: role?.roleName || "NO ACTIVE ROLE",
+    kicker: roleNameLabel(role) || "NO ACTIVE ROLE",
     multiplier: role?.roleName ? multiplierLabel(role.multiplier) : "×1",
     value: state.turn.toString().padStart(2, "0"),
     unit: "TURN",
@@ -185,7 +199,11 @@ function renderPreview(state) {
   const selected = engine.getSelectedCard();
   const preview = selected ? engine.getAttackPreview(selected.id) : null;
   const role = preview
-    ? { roleName: preview.roleName, multiplier: preview.roleMultiplier }
+    ? {
+        roles: preview.roles,
+        roleName: preview.roleName,
+        multiplier: preview.roleMultiplier,
+      }
     : state.currentRole;
 
   return `
@@ -210,7 +228,8 @@ function renderPreview(state) {
         <div class="formula-divider"><span>×</span></div>
         <div class="role-formula">
           <span class="preview-label">HAND ROLE</span>
-          <div><strong>${role?.roleName || "NONE"}</strong><b>${multiplierLabel(role?.multiplier ?? 1)}</b></div>
+          <div><strong>${roleNameLabel(role) || "NONE"}</strong><b>${multiplierLabel(role?.multiplier ?? 1)}</b></div>
+          ${roleBreakdown(role) ? `<small class="role-breakdown">${roleBreakdown(role)}</small>` : ""}
         </div>
         <div class="final-damage">
           <span>FINAL DAMAGE</span>
@@ -250,6 +269,8 @@ function renderPoints(state) {
       <div class="resource-stats">
         <span><i class="deck-icon"></i>DECK <b>${state.player.deck.length}</b></span>
         <span><i class="discard-icon"></i>DISCARD <b>${state.player.discardPile.length}</b></span>
+        ${state.player.shield ? `<span class="buff-chip buff-chip--shield">SHIELD ${state.player.shield}</span>` : ""}
+        ${state.player.extraAttacks ? `<span class="buff-chip buff-chip--extra">攻撃 あと${state.player.extraAttacks + 1}回</span>` : ""}
         ${activeBonus ? `<span class="buff-chip">ATK +${activeBonus} ACTIVE</span>` : ""}
         ${pendingBonus ? `<span class="buff-chip buff-chip--pending">NEXT ATK +${pendingBonus}</span>` : ""}
       </div>
@@ -584,7 +605,7 @@ function render() {
       <section class="hand-section">
         <div class="hand-heading">
           <div><span class="eyebrow">YOUR ARSENAL</span><h2>HAND <b>${state.player.hand.length}</b></h2></div>
-          <div class="hand-role"><span>CURRENT ROLE</span><strong>${state.currentRole?.roleName || "NONE"}</strong><b>${multiplierLabel(state.currentRole?.multiplier ?? 1)}</b></div>
+          <div class="hand-role"><span>CURRENT ROLE</span><strong>${roleNameLabel(state.currentRole) || "NONE"}</strong><b>${multiplierLabel(state.currentRole?.multiplier ?? 1)}</b></div>
         </div>
         <div class="hand-track">${renderHand(state)}</div>
       </section>
@@ -647,6 +668,11 @@ function handleCardClick(cardId) {
   if (!card || card.cost > state.player.point) return;
 
   if (isTacticalCard(card)) {
+    if (requiredTargetCount(card) === 0) {
+      engine.playTacticalCard(cardId, []);
+      render();
+      return;
+    }
     pendingTactical = { cardId, targets: [] };
     render();
     return;

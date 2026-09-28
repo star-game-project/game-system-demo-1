@@ -146,9 +146,9 @@
 
       <h3>6.4 シールドと追加攻撃</h3>
       <p>どちらも<b>ターンをまたがない</b>。ターン終了時に0へ戻す。</p>
-      <p><b>シールド</b>はCPUの攻撃を先に吸収し、残った分だけHPが減る。CPUの攻撃力は固定なので、必要なシールド量は常に計算できる。</p>
-      <pre><code>absorbed = Math.min(shield, CPU_ATTACK_DAMAGE)
-taken    = CPU_ATTACK_DAMAGE - absorbed
+      <p><b>シールド</b>はCPUの攻撃を先に吸収し、残った分だけHPが減る。CPUの次の行動は常に予告されるので、必要なシールド量は常に計算できる。</p>
+      <pre><code>absorbed = Math.min(shield, intent.value)
+taken    = intent.value - absorbed
 hp      -= taken</code></pre>
       <p><b>追加攻撃</b>が残っている間、攻撃カードを使ってもターンが終了せずカード選択に戻る。2回目の攻撃は<b>1枚減った手札で役を判定し直す</b>ため、殴るほど役が崩れる可能性がある。CPUのHPが0になった場合は追加攻撃の残りに関わらず即座に勝利となる。</p>
 
@@ -273,9 +273,15 @@ Temporary Bonus +5   （前ターンの Boost 2 による）
 
     <section id="cpu">
       <h2>10. CPU</h2>
-      <p>本デモのCPUはカードを使用せず、毎ターン固定ダメージで攻撃するのみ。</p>
-      <pre><code>player.hp = Math.max(0, player.hp - CPU_ATTACK_DAMAGE)</code></pre>
-      <p>CPUの状態はHPと最大HPのみを持つ。</p>
+      <p>本デモのCPUはカードを使用せず、<b>行動パターン</b>（<code>src/data/enemies.js</code> の <code>CPU_ACTION_PATTERN</code>）を先頭から1ターンに1つずつ実行する。末尾の次は先頭に戻る。ランダム性はない。</p>
+      <p>次に実行する行動（<b>行動予告</b>）と、パターン全体・現在位置は常に画面に表示される。予告された行動がそのまま実行される。</p>
+      <pre><code>intent = cpu.actionPattern[cpu.actionIndex]
+cpu.actionIndex = (cpu.actionIndex + 1) % cpu.actionPattern.length</code></pre>
+      <p>現在のパターンは <code>ATTACK 14</code> の1種類のみで、毎ターン14ダメージの攻撃となる。</p>
+      <div class="docs-table-wrap"><table>
+        <thead><tr><th>行動</th><th>効果</th></tr></thead>
+        <tbody><tr><td><code>ATTACK n</code></td><td>シールドで吸収した残りを <code>player.hp</code> から引く</td></tr></tbody>
+      </table></div>
     </section>
 
     <section id="result">
@@ -301,7 +307,11 @@ Temporary Bonus +5   （前ターンの Boost 2 による）
     temporaryEffects: TemporaryEffect[];
   };
 
-  cpu: { hp: number; maxHp: number };
+  cpu: {
+    hp: number; maxHp: number;
+    actionPattern: CpuAction[];   // 先頭から順に実行し、ループする
+    actionIndex: number;          // 次に実行する行動（予告）の位置
+  };
 
   selectedCardId: string | null;
   currentRole: HandRoleResult | null;

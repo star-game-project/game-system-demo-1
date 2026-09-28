@@ -13,6 +13,8 @@ import { BattleEngine } from "../src/game/battleEngine.js";
 import { isTacticalCard, isWildCard } from "../src/game/abilityLogic.js";
 import { evaluateHandRole } from "../src/game/roleLogic.js";
 import { createInitialGameState } from "../src/game/gameState.js";
+import { CPU_ACTION_PATTERN } from "../src/data/enemies.js";
+import { getCpuIntent } from "../src/game/enemyLogic.js";
 
 test("the default deck is a legal twenty-card build", () => {
   const deck = createDemoDeck();
@@ -85,8 +87,10 @@ test("CPU attacks, points recover with a max of ten, and turn advances", () => {
   state.player.point = 8;
   const engine = new BattleEngine(state);
 
+  const intent = getCpuIntent(engine.state.cpu);
+
   assert.equal(engine.startCpuTurn(), true);
-  assert.equal(engine.state.player.hp, GAME_CONFIG.PLAYER_MAX_HP - GAME_CONFIG.CPU_ATTACK_DAMAGE);
+  assert.equal(engine.state.player.hp, GAME_CONFIG.PLAYER_MAX_HP - intent.value);
   assert.equal(engine.finishTurn(), true);
   assert.equal(engine.state.player.point, 10);
   assert.equal(engine.state.turn, 2);
@@ -320,11 +324,12 @@ test("shield absorbs the CPU attack before HP is touched", () => {
   engine.playTacticalCard("guard", []);
   engine.state.phase = PHASES.PLAYER_ATTACK;
   const hpBefore = engine.state.player.hp;
+  const incoming = getCpuIntent(engine.state.cpu).value;
 
   engine.startCpuTurn();
 
-  const absorbed = Math.min(14, GAME_CONFIG.CPU_ATTACK_DAMAGE);
-  assert.equal(engine.state.player.hp, hpBefore - (GAME_CONFIG.CPU_ATTACK_DAMAGE - absorbed));
+  const absorbed = Math.min(14, incoming);
+  assert.equal(engine.state.player.hp, hpBefore - (incoming - absorbed));
   assert.equal(engine.state.player.shield, 14 - absorbed);
   assert.match(engine.state.battleMessage, /シールド/);
 });
@@ -376,4 +381,32 @@ test("unused extra attacks do not carry into the next turn", () => {
   engine.finishTurn();
 
   assert.equal(engine.state.player.extraAttacks, 0);
+});
+
+test("the CPU starts at the head of its action pattern", () => {
+  const state = createInitialGameState(() => 0.5);
+  assert.equal(state.cpu.actionIndex, 0);
+  assert.deepEqual(getCpuIntent(state.cpu), CPU_ACTION_PATTERN[0]);
+});
+
+test("the CPU performs exactly the announced action, then announces the next one", () => {
+  const state = createInitialGameState(() => 0.5);
+  state.cpu.actionPattern = [
+    { type: "ATTACK", value: 5 },
+    { type: "ATTACK", value: 30 },
+  ];
+  const engine = new BattleEngine(state);
+  const hpBefore = state.player.hp;
+
+  state.phase = PHASES.PLAYER_ATTACK;
+  engine.startCpuTurn();
+  assert.equal(state.player.hp, hpBefore - 5);
+  assert.deepEqual(state.lastCpuAttack.action, { type: "ATTACK", value: 5 });
+  assert.deepEqual(getCpuIntent(state.cpu), { type: "ATTACK", value: 30 });
+
+  engine.finishTurn();
+  state.phase = PHASES.PLAYER_ATTACK;
+  engine.startCpuTurn();
+  assert.equal(state.player.hp, hpBefore - 35);
+  assert.deepEqual(getCpuIntent(state.cpu), { type: "ATTACK", value: 5 });
 });

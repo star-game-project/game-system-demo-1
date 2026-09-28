@@ -48,7 +48,6 @@ const CONSTANT_LABELS = {
   DRAW_COST: "ドローの消費ポイント",
   START_HAND_SIZE: "手札の枚数",
   DECK_SIZE: "デッキ枚数",
-  CPU_ATTACK_DAMAGE: "CPUの攻撃力",
 };
 
 const DECK_RULE_LABELS = {

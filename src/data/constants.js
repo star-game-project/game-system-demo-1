@@ -7,7 +7,6 @@ export const GAME_CONFIG = Object.freeze({
   DRAW_COST: 1,
   START_HAND_SIZE: 5,
   DECK_SIZE: 20,
-  CPU_ATTACK_DAMAGE: 14,
 });
 
 /** デッキ構築の制約。目を最大4枚に抑えることで、単一の目に寄せたデッキを防ぐ。 */

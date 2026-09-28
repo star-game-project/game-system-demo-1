@@ -242,6 +242,27 @@ a:focus-visible {
   font-size: 10px;
 }
 
+.cpu-intent {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 10px;
+  margin-top: 10px;
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  color: var(--muted);
+}
+
+.cpu-intent strong {
+  color: var(--text);
+  font-size: 13px;
+}
+
+.cpu-intent small {
+  flex-basis: 100%;
+  font-size: 9px;
+}
+
 .hp-track {
   height: 8px;
   position: relative;

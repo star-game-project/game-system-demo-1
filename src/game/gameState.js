@@ -1,5 +1,6 @@
 import { GAME_CONFIG, PHASES } from "../data/constants.js";
 import { createDemoDeck } from "../data/cards.js";
+import { CPU_ACTION_PATTERN } from "../data/enemies.js";
 import { drawCards, shuffleDeck } from "./deckLogic.js";
 import { evaluateHandRole } from "./roleLogic.js";
 
@@ -26,6 +27,8 @@ export function createInitialGameState(random = Math.random, deckCards = null) {
     cpu: {
       hp: GAME_CONFIG.CPU_MAX_HP,
       maxHp: GAME_CONFIG.CPU_MAX_HP,
+      actionPattern: CPU_ACTION_PATTERN,
+      actionIndex: 0,
     },
     selectedCardId: null,
     currentRole: evaluateHandRole(openingDraw.drawn),

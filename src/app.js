@@ -28,6 +28,7 @@ import {
   requiredTargetCount,
 } from "./game/abilityLogic.js";
 import { BattleEngine } from "./game/battleEngine.js";
+import { cpuActionLabel, getCpuIntent } from "./game/enemyLogic.js";
 import { createInitialGameState } from "./game/gameState.js";
 
 const app = document.querySelector("#app");
@@ -113,6 +114,22 @@ function abilityLabel(card) {
   return `<span class="ability ability--none">NO ABILITY</span>`;
 }
 
+/** 行動予告。次の行動に加え、パターン全体と現在位置も隠さず表示する。 */
+function renderCpuIntent(cpu) {
+  const pattern = cpu.actionPattern
+    .map((action, index) => {
+      const text = cpuActionLabel(action);
+      return index === cpu.actionIndex ? `<b>[${text}]</b>` : text;
+    })
+    .join(" → ");
+  return `
+    <div class="cpu-intent">
+      <span>NEXT ACTION</span><strong>${cpuActionLabel(getCpuIntent(cpu))}</strong>
+      <small>PATTERN ${cpu.actionIndex + 1}/${cpu.actionPattern.length}: ${pattern} → (loop)</small>
+    </div>
+  `;
+}
+
 function statusPanel(entity, label, modifier = "") {
   const percent = hpPercent(entity.hp, entity.maxHp);
   return `
@@ -128,6 +145,7 @@ function statusPanel(entity, label, modifier = "") {
         <div class="hp-track__fill" style="--hp:${percent}%"></div>
         <div class="hp-track__shine"></div>
       </div>
+      ${modifier === "cpu" ? renderCpuIntent(entity) : ""}
     </section>
   `;
 }
@@ -154,10 +172,11 @@ function getCenterDisplay(state) {
   }
 
   if (state.phase === PHASES.CPU_ATTACK || state.phase === PHASES.DEFEAT) {
+    const hit = state.lastCpuAttack;
     return {
-      kicker: "ENEMY STRIKE",
-      multiplier: "",
-      value: `${GAME_CONFIG.CPU_ATTACK_DAMAGE}`,
+      kicker: `ENEMY ${cpuActionLabel(hit.action)}`,
+      multiplier: hit.absorbed ? `SHIELD −${hit.absorbed}` : "",
+      value: `${hit.taken}`,
       unit: "DAMAGE TAKEN",
       className: "combat-readout--enemy-hit",
     };

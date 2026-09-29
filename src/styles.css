@@ -1659,3 +1659,54 @@ a:focus-visible {
   display: grid;
   gap: 6px;
 }
+
+.point-rules {
+  display: grid;
+  gap: 10px;
+  margin: 0 0 16px;
+  padding: 14px 18px;
+  border: 1px solid var(--line);
+  background: var(--surface);
+}
+
+.point-rules > div:first-child {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 14px;
+  align-items: baseline;
+}
+
+.point-rules__fields,
+.point-rules__presets {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 18px;
+  align-items: end;
+}
+
+.point-rules__field {
+  display: grid;
+  gap: 4px;
+  font-size: 10px;
+  color: var(--muted);
+}
+
+.point-rules__field input[type="number"] {
+  width: 64px;
+  padding: 4px 6px;
+  font: inherit;
+  font-size: 14px;
+  color: var(--text);
+  background: transparent;
+  border: 1px solid var(--line);
+}
+
+.point-rules__presets .is-active {
+  outline: 1px solid var(--cyan);
+}
+
+.point-rules-note {
+  display: block;
+  color: var(--muted);
+  font-size: 9px;
+}

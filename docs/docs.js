@@ -43,9 +43,9 @@ const MEASURED_FREQUENCY = {
 const CONSTANT_LABELS = {
   PLAYER_MAX_HP: "プレイヤー最大HP",
   CPU_MAX_HP: "CPU最大HP",
-  START_POINT: "開始時ポイント",
-  MAX_POINT: "最大ポイント",
-  TURN_POINT_RECOVERY: "ターン終了時の回復量",
+  START_POINT: "開始時ポイント（既定値）",
+  MAX_POINT: "最大ポイント（既定値）",
+  TURN_POINT_RECOVERY: "ターン終了時の回復量（既定値）",
   DRAW_COST: "ドローの消費ポイント",
   START_HAND_SIZE: "手札の枚数",
   DECK_SIZE: "デッキ枚数",

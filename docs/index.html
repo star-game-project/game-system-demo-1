@@ -129,7 +129,16 @@
 
       <h3>6.1 ポイント</h3>
       <p>カードの使用とドローに必要。ターン終了時に回復し、最大値を超えない。0未満にもならない。</p>
-      <pre><code>point = Math.min(maxPoint, point + TURN_POINT_RECOVERY)</code></pre>
+      <pre><code>point = fullRefill
+  ? maxPoint                                  // 毎ターン上限まで全回復（貯められない）
+  : Math.min(maxPoint, point + recovery)</code></pre>
+      <p>開始値・上限・回復量・全回復の有無は<b>デッキ構築画面の POINT RULES で変更できる</b>（1〜20の整数。開始値は上限を超えない）。既定値は2章の定数（開始10・上限10・+5）。比較用に次のプリセットがある。設定は連戦中も引き継ぎ、戦闘画面のポイント欄にも表示する。</p>
+      <ul>
+        <li>標準：開始10 / 上限10 / +5</li>
+        <li>A：開始10 / 上限10 / +3</li>
+        <li>B：開始6 / 上限6 / +5</li>
+        <li>C：開始5 / 上限5 / 毎ターン5まで全回復</li>
+      </ul>
       <p>カードは種類を問わずポイントが続く限り何枚でも使えるため、<b>ポイントが1ターンに使えるカード枚数の上限</b>になる。</p>
 
       <h3>6.2 ドロー</h3>
@@ -319,6 +328,7 @@ cpu.hp  -= dealt</code></pre>
       <h2>12. 状態</h2>
       <pre><code>type GameState = {
   battle: number;               // 連戦の何戦目か（1始まり）
+  pointRules: { startPoint: number; maxPoint: number; recovery: number; fullRefill: boolean };
   turn: number;
   phase: GamePhase;
 

@@ -31,6 +31,13 @@ import {
 import { BattleEngine } from "./game/battleEngine.js";
 import { cpuActionLabel, getCpuIntent } from "./game/enemyLogic.js";
 import { createInitialGameState } from "./game/gameState.js";
+import {
+  DEFAULT_POINT_RULES,
+  POINT_RULE_LIMIT,
+  POINT_RULE_PRESETS,
+  normalizePointRules,
+  pointRulesLabel,
+} from "./game/pointRules.js";
 
 const app = document.querySelector("#app");
 const timers = new Set();
@@ -39,6 +46,8 @@ const DIE_FACES = ["", "⚀", "⚁", "⚂", "⚃", "⚄", "⚅"];
 let screen = SCREENS.DECK_BUILD;
 let deckCounts = { ...createEmptyCounts(), ...DEFAULT_DECK_COUNTS };
 let engine = null;
+// 構築画面で選ぶポイント設定。連戦中も引き継ぐ。
+let pointRules = { ...DEFAULT_POINT_RULES };
 // 戦術カードの対象選択中だけ保持する UI 状態。
 let pendingTactical = null;
 
@@ -47,7 +56,7 @@ function startBattle(carry = {}) {
   clearTimers();
   pendingTactical = null;
   engine = new BattleEngine(
-    createInitialGameState(Math.random, createDeckFromCounts(deckCounts), carry),
+    createInitialGameState(Math.random, createDeckFromCounts(deckCounts), { pointRules, ...carry }),
   );
   screen = SCREENS.BATTLE;
 }
@@ -299,6 +308,7 @@ function renderPoints(state) {
         <span class="resource-label">ENERGY</span>
         <div class="point-dots" aria-label="ポイント ${state.player.point} / ${state.player.maxPoint}">${dots}</div>
         <strong>${state.player.point}<small> / ${state.player.maxPoint}</small></strong>
+        <small class="point-rules-note">${pointRulesLabel(state.pointRules)}</small>
       </div>
       <div class="resource-stats">
         <span><i class="deck-icon"></i>DECK <b>${state.player.deck.length}</b></span>
@@ -574,6 +584,37 @@ function createRoleDialog() {
   return dialog;
 }
 
+function renderPointRules() {
+  const input = (key, label) => `
+    <label class="point-rules__field">
+      <span>${label}</span>
+      <input type="number" min="${POINT_RULE_LIMIT.MIN}" max="${POINT_RULE_LIMIT.MAX}" step="1"
+        value="${pointRules[key]}" data-point-rule="${key}"
+        ${key === "recovery" && pointRules.fullRefill ? "disabled" : ""} />
+    </label>
+  `;
+  const presets = POINT_RULE_PRESETS.map((preset) => {
+    const active =
+      JSON.stringify(normalizePointRules(preset.rules)) === JSON.stringify(normalizePointRules(pointRules));
+    return `<button class="command-button command-button--secondary ${active ? "is-active" : ""}" data-point-preset="${preset.id}">${preset.label}</button>`;
+  }).join("");
+  return `
+    <section class="point-rules">
+      <div><span class="eyebrow">POINT RULES</span><strong>${pointRulesLabel(pointRules)}</strong></div>
+      <div class="point-rules__fields">
+        ${input("startPoint", "開始")}
+        ${input("maxPoint", "上限")}
+        ${input("recovery", "毎ターン回復")}
+        <label class="point-rules__field">
+          <span>毎ターン上限まで全回復</span>
+          <input type="checkbox" data-point-rule="fullRefill" ${pointRules.fullRefill ? "checked" : ""} />
+        </label>
+      </div>
+      <div class="point-rules__presets">${presets}</div>
+    </section>
+  `;
+}
+
 function renderDeckBuild() {
   const { valid, errors, summary } = validateDeck(deckCounts);
   return `
@@ -604,6 +645,8 @@ function renderDeckBuild() {
           <div><dt>AVG ATK</dt><dd>${summary.averageAttack.toFixed(1)}</dd></div>
         </dl>
       </section>
+
+      ${renderPointRules()}
 
       ${
         errors.length
@@ -763,6 +806,23 @@ function bindEvents() {
   app.querySelectorAll("[data-deck-remove]").forEach((button) => {
     button.addEventListener("click", () => {
       deckCounts = removeCard(deckCounts, button.dataset.deckRemove);
+      render();
+    });
+  });
+
+  app.querySelectorAll("[data-point-rule]").forEach((input) => {
+    input.addEventListener("change", () => {
+      const key = input.dataset.pointRule;
+      const value = input.type === "checkbox" ? input.checked : input.value;
+      pointRules = normalizePointRules({ ...pointRules, [key]: value });
+      render();
+    });
+  });
+
+  app.querySelectorAll("[data-point-preset]").forEach((button) => {
+    button.addEventListener("click", () => {
+      const preset = POINT_RULE_PRESETS.find((item) => item.id === button.dataset.pointPreset);
+      pointRules = normalizePointRules(preset.rules);
       render();
     });
   });

@@ -4,6 +4,7 @@ import { evaluateHandRole } from "./roleLogic.js";
 import { calculateAttack } from "./damageLogic.js";
 import { advanceCpuAction, cpuActionDamage, getCpuIntent } from "./enemyLogic.js";
 import { createTurnTotals } from "./gameState.js";
+import { recoverPoints } from "./pointRules.js";
 import {
   createTemporaryEffects,
   isDefenseCard,
@@ -310,10 +311,7 @@ export class BattleEngine {
     if (this.state.phase !== PHASES.CPU_ATTACK) return false;
     const pointBefore = this.state.player.point;
     this.state.phase = PHASES.POINT_RECOVERY;
-    this.state.player.point = Math.min(
-      this.state.player.maxPoint,
-      this.state.player.point + GAME_CONFIG.TURN_POINT_RECOVERY,
-    );
+    this.state.player.point = recoverPoints(this.state.player.point, this.state.pointRules);
     const recovered = this.state.player.point - pointBefore;
     this.state.turn += 1;
     this.state.player.temporaryEffects = pruneTemporaryEffects(

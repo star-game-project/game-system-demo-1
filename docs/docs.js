@@ -17,6 +17,7 @@ import { BONUS_ROLES, PENALTY_ROLES, ROLE_FAMILIES } from "/src/data/roles.js";
 import { summarizeDeck, bucketLimit } from "/src/game/deckBuilder.js";
 import {
   TACTICAL_ABILITIES,
+  isDefenseCard,
   isTacticalCard,
   isWildCard,
 } from "/src/game/abilityLogic.js";
@@ -165,13 +166,17 @@ table(
 // ---- 4.2 カード一覧 ----
 table(
   document.querySelector("#catalogue-table"),
-  ["カード", "種別", "目", "Cost", "ATK", "能力"],
+  ["カード", "種別", "目", "Cost", "ATK / DEF", "能力"],
   CARD_CATALOGUE.map((definition) => [
     `<b>${definition.name}</b>`,
-    isTacticalCard(definition) ? "戦術" : "攻撃",
+    isTacticalCard(definition) ? "戦術" : isDefenseCard(definition) ? "防御" : "攻撃",
     dieLabel(definition),
     `${definition.cost}`,
-    isTacticalCard(definition) ? "—" : `${definition.attack}`,
+    isTacticalCard(definition)
+      ? "—"
+      : isDefenseCard(definition)
+        ? `DEF ${definition.defense}`
+        : `${definition.attack}`,
     abilityText(definition),
   ]),
 );

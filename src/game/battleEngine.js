@@ -5,6 +5,7 @@ import { calculateAttack } from "./damageLogic.js";
 import { advanceCpuAction, cpuActionDamage, getCpuIntent } from "./enemyLogic.js";
 import {
   createTemporaryEffects,
+  isDefenseCard,
   isTacticalCard,
   pruneTemporaryEffects,
   requiredTargetCount,
@@ -78,7 +79,9 @@ export class BattleEngine {
     if (!card || isTacticalCard(card)) return false;
     if (card.cost > this.state.player.point) return false;
     this.state.selectedCardId = card.id;
-    this.state.battleMessage = `${card.name} を選択中。攻撃内容を確認してください。`;
+    this.state.battleMessage = isDefenseCard(card)
+      ? `${card.name} を選択中。シールド +${card.defense} を得てターンを終了します。`
+      : `${card.name} を選択中。攻撃内容を確認してください。`;
     return true;
   }
 
@@ -90,7 +93,7 @@ export class BattleEngine {
 
   getAttackPreview(cardId = this.state.selectedCardId) {
     const card = this.state.player.hand.find((item) => item.id === cardId);
-    if (!card) return null;
+    if (!card || isDefenseCard(card)) return null;
     const attack = calculateAttack(card, this.state.player.hand, this.state.player, this.state.turn);
     return { ...attack, ...this.applyCpuBlock(attack.finalAttack, false) };
   }
@@ -103,6 +106,7 @@ export class BattleEngine {
     return { blocked, dealt: damage - blocked };
   }
 
+  /** 攻撃カードまたは防御カード（ターンを終了する通常行動）で使えるものがあるか。 */
   hasPlayableAttackCard() {
     const { player } = this.state;
     return player.hand.some(
@@ -202,6 +206,7 @@ export class BattleEngine {
     const card = this.getSelectedCard();
     if (!card || isTacticalCard(card)) return null;
     if (card.cost > this.state.player.point) return null;
+    if (isDefenseCard(card)) return this.defendWith(card);
 
     const attack = calculateAttack(
       card,
@@ -227,6 +232,7 @@ export class BattleEngine {
     this.state.player.cardsPlayed += 1;
     this.state.currentRole = evaluateHandRole(this.state.player.hand);
     this.state.lastAttack = { ...attack, cardName: card.name };
+    this.state.lastDefense = null;
     this.state.selectedCardId = null;
 
     if (this.state.cpu.hp <= 0) {
@@ -246,6 +252,38 @@ export class BattleEngine {
     this.state.battleMessage = `${card.name} — ${damageText}！`;
     this.state.phase = PHASES.PLAYER_ATTACK;
     return attack;
+  }
+
+  /**
+   * 防御カードを使う。攻撃と同じ通常行動の枠で、使うとターンを終了する
+   * （追加攻撃が残っていれば、攻撃と同じくその1回分を消費して続行する）。
+   * 防御値に役の倍率は掛からない。
+   */
+  defendWith(card) {
+    const { player } = this.state;
+    const defense = { cardName: card.name, shield: card.defense };
+
+    player.point = Math.max(0, player.point - card.cost);
+    player.shield += card.defense;
+    player.hand = player.hand.filter((item) => item.id !== card.id);
+    player.discardPile.push(card);
+    player.cardsPlayed += 1;
+    this.state.currentRole = evaluateHandRole(player.hand);
+    this.state.lastAttack = null;
+    this.state.lastDefense = defense;
+    this.state.selectedCardId = null;
+
+    const shieldText = `${card.name} — シールド +${card.defense}（現在 ${player.shield}）。`;
+    if (player.extraAttacks > 0) {
+      player.extraAttacks -= 1;
+      this.state.battleMessage = `${shieldText} 続けてあと${player.extraAttacks + 1}回行動できます。`;
+      this.state.phase = PHASES.CARD_SELECT;
+      return defense;
+    }
+
+    this.state.battleMessage = shieldText;
+    this.state.phase = PHASES.PLAYER_ATTACK;
+    return defense;
   }
 
   startCpuTurn() {
@@ -328,6 +366,7 @@ export class BattleEngine {
     if (this.hasPlayableAttackCard()) return false;
     this.state.selectedCardId = null;
     this.state.lastAttack = null;
+    this.state.lastDefense = null;
     this.state.phase = PHASES.PLAYER_ATTACK;
     this.state.battleMessage = "使用できるカードがないため、ターンを終了します。";
     return true;

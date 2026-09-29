@@ -23,6 +23,7 @@ import {
 } from "./game/deckBuilder.js";
 import {
   getTemporaryBonus,
+  isDefenseCard,
   isTacticalCard,
   isWildCard,
   requiredTargetCount,
@@ -102,6 +103,9 @@ function abilityLabel(card) {
   if (isTacticalCard(card)) {
     return `<span class="ability ability--tactical"><i>◆</i> ${tacticalLabel(card.tacticalAbility)}</span>`;
   }
+  if (isDefenseCard(card)) {
+    return `<span class="ability ability--support"><i>◇</i> SHIELD +${card.defense} / ENDS TURN / NO ROLE ×</span>`;
+  }
   if (isWildCard(card)) {
     return `<span class="ability ability--wild"><i>◈</i> WILD DIE</span>`;
   }
@@ -153,6 +157,16 @@ function statusPanel(entity, label, modifier = "") {
 }
 
 function getCenterDisplay(state) {
+  if (state.phase === PHASES.PLAYER_ATTACK && state.lastDefense) {
+    return {
+      kicker: `DEFEND — ${state.lastDefense.cardName}`,
+      multiplier: "",
+      value: `+${state.lastDefense.shield}`,
+      unit: `SHIELD (TOTAL ${state.player.shield})`,
+      className: "",
+    };
+  }
+
   if (state.phase === PHASES.PLAYER_ATTACK || state.phase === PHASES.VICTORY) {
     const attack = state.lastAttack;
     if (!attack) {
@@ -252,10 +266,11 @@ function renderPreview(state) {
           <div><strong>${roleNameLabel(role) || "NONE"}</strong><b>${multiplierLabel(role?.multiplier ?? 1)}</b></div>
           ${roleBreakdown(role) ? `<small class="role-breakdown">${roleBreakdown(role)}</small>` : ""}
         </div>
-        <div class="final-damage">
-          <span>FINAL DAMAGE</span>
-          <strong>${preview?.finalAttack ?? "—"}</strong>
-        </div>
+        ${
+          isDefenseCard(selected)
+            ? `<div class="final-damage"><span>SHIELD（役倍率なし）</span><strong>+${selected.defense}</strong></div>`
+            : `<div class="final-damage"><span>FINAL DAMAGE</span><strong>${preview?.finalAttack ?? "—"}</strong></div>`
+        }
         <dl class="damage-formula">
           <div><dt>ENEMY BLOCK</dt><dd>${preview ? `−${preview.blocked}` : `${state.cpu.block}`}</dd></div>
           <div><dt>DEALT</dt><dd>${preview?.dealt ?? "—"}</dd></div>
@@ -314,7 +329,8 @@ function renderHand(state) {
   return state.player.hand
     .map((card, index) => {
       const tactical = isTacticalCard(card);
-      const preview = tactical ? null : engine.getAttackPreview(card.id);
+      const defense = isDefenseCard(card);
+      const preview = tactical || defense ? null : engine.getAttackPreview(card.id);
       const selected = card.id === state.selectedCardId;
       const unaffordable = card.cost > state.player.point;
       const isSource = targeting && card.id === pendingTactical.cardId;
@@ -346,7 +362,7 @@ function renderHand(state) {
           style="--card-index:${index}"
           ${interactive ? "" : "disabled"}
           aria-pressed="${selected || isTarget}"
-          aria-label="${card.name}、目${card.dieValue}、${tactical ? tacticalLabel(card.tacticalAbility) : `攻撃${card.attack}`}、コスト${card.cost}"
+          aria-label="${card.name}、目${card.dieValue}、${tactical ? tacticalLabel(card.tacticalAbility) : defense ? `防御${card.defense}` : `攻撃${card.attack}`}、コスト${card.cost}"
         >
           <span class="battle-card__edge"></span>
           <span class="battle-card__cost"><small>COST</small>${card.cost}</span>
@@ -357,6 +373,8 @@ function renderHand(state) {
           ${
             tactical
               ? `<span class="battle-card__attack battle-card__attack--tactical"><small>TACTICAL</small><b>—</b></span>`
+              : defense
+              ? `<span class="battle-card__attack"><small>DEF</small><b>${card.defense}</b></span>`
               : `<span class="battle-card__attack"><small>ATK</small><b>${card.attack + bonus}</b>${bonus ? `<em>+${bonus}</em>` : ""}</span>`
           }
           ${abilityLabel(card)}
@@ -411,13 +429,16 @@ function renderCommands(state) {
 
   if (state.phase === PHASES.CARD_SELECT) {
     const canAttack = engine.hasPlayableAttackCard();
+    const defending = isDefenseCard(selected);
     const headline = selected
-      ? `${selected.name} で攻撃`
+      ? `${selected.name} で${defending ? "防御" : "攻撃"}`
       : canAttack
         ? "使用するカードを選択"
         : "攻撃できるカードがありません";
     const detail = selected
-      ? "使用前の手札で役を判定します"
+      ? defending
+        ? `シールド +${selected.defense} を得てターンを終了します（役の倍率は掛かりません）`
+        : "使用前の手札で役を判定します"
       : canAttack
         ? "戦術カードは攻撃せず手札を操作します（ターンは終了しません）"
         : "戦術カードで手札を整えるか、ターンを終了しましょう";
@@ -427,7 +448,7 @@ function renderCommands(state) {
         <div><strong>${headline}</strong><small>${detail}</small></div>
       </div>
       <div class="command-actions">
-        ${!canAttack ? `<button class="command-button command-button--danger" data-action="end-turn">END TURN</button>` : `<button class="command-button command-button--attack" data-action="attack" ${selected ? "" : "disabled"}><span>EXECUTE</span><small>ATTACK</small></button>`}
+        ${!canAttack ? `<button class="command-button command-button--danger" data-action="end-turn">END TURN</button>` : `<button class="command-button command-button--attack" data-action="attack" ${selected ? "" : "disabled"}><span>EXECUTE</span><small>${defending ? "DEFEND" : "ATTACK"}</small></button>`}
       </div>
     `;
   }
@@ -498,7 +519,7 @@ function renderCatalogue() {
           <span class="catalogue-card__die">${dieGlyph(definition)}</span>
           <div>
             <strong>${definition.name}</strong>
-            <small>${tactical ? "TACTICAL" : `ATK ${definition.attack}`} / COST ${definition.cost}</small>
+            <small>${tactical ? "TACTICAL" : isDefenseCard(definition) ? `DEF ${definition.defense}` : `ATK ${definition.attack}`} / COST ${definition.cost}</small>
           </div>
         </header>
         ${abilityLabel(definition)}
@@ -575,6 +596,7 @@ function renderDeckBuild() {
         </div>
         <dl class="build-summary__stats">
           <div><dt>ATTACK</dt><dd>${summary.attackCount}</dd></div>
+          <div><dt>DEFENSE</dt><dd>${summary.defenseCount}</dd></div>
           <div><dt>TACTICAL</dt><dd>${summary.tacticalCount}</dd></div>
           <div><dt>AVG COST</dt><dd>${summary.averageCost.toFixed(1)}</dd></div>
           <div><dt>AVG ATK</dt><dd>${summary.averageAttack.toFixed(1)}</dd></div>

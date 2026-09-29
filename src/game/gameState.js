@@ -35,6 +35,7 @@ export function createInitialGameState(random = Math.random, deckCards = null) {
     selectedCardId: null,
     currentRole: evaluateHandRole(openingDraw.drawn),
     lastAttack: null,
+    lastDefense: null,
     battleMessage: `${GAME_CONFIG.START_HAND_SIZE}枚のカードをドロー。あなたのターンです。`,
   };
 }

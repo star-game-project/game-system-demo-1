@@ -5,31 +5,11 @@
 const CARD_CATALOGUE = Object.freeze([
   // ---- 攻撃カード ----
   {
-    key: "strike_1",
-    name: "Strike 1",
-    cost: 1,
-    attack: 10,
-    dieValue: 1,
-    onUseAbility: null,
-    passiveAbility: null,
-    tacticalAbility: null,
-  },
-  {
     key: "pierce_1",
     name: "Pierce 1",
     cost: 2,
     attack: 18,
     dieValue: 1,
-    onUseAbility: null,
-    passiveAbility: null,
-    tacticalAbility: null,
-  },
-  {
-    key: "jab_2",
-    name: "Jab 2",
-    cost: 1,
-    attack: 8,
-    dieValue: 2,
     onUseAbility: null,
     passiveAbility: null,
     tacticalAbility: null,
@@ -116,6 +96,31 @@ const CARD_CATALOGUE = Object.freeze([
     tacticalAbility: null,
   },
 
+  // ---- 防御カード（攻撃の代わりに使う通常行動。使うとターンが終了する。防御値に役の倍率は掛からない）----
+  // 攻撃カードとしては使い道のなかった低攻撃力のカード（旧 Strike 1 / Jab 2）を置き換えたもの。
+  {
+    key: "brace_1",
+    name: "Brace 1",
+    cost: 1,
+    attack: 0,
+    defense: 10,
+    dieValue: 1,
+    onUseAbility: null,
+    passiveAbility: null,
+    tacticalAbility: null,
+  },
+  {
+    key: "parry_2",
+    name: "Parry 2",
+    cost: 1,
+    attack: 0,
+    defense: 10,
+    dieValue: 2,
+    onUseAbility: null,
+    passiveAbility: null,
+    tacticalAbility: null,
+  },
+
   // ---- 戦術カード（攻撃せず、ターンも終了しない）----
   {
     key: "tune_up",
@@ -195,7 +200,7 @@ export const CARD_BY_KEY = Object.freeze(
 
 /** 目の上限を守った初期デッキ（合計20枚）。 */
 export const DEFAULT_DECK_COUNTS = Object.freeze({
-  strike_1: 1,
+  brace_1: 1,
   pierce_1: 2,
   double_tap: 1,
   boost_2: 2,

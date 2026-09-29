@@ -18,12 +18,12 @@ test("an empty deck is invalid and the default deck is valid", () => {
 
 test("a die value cannot exceed its budget", () => {
   let counts = createEmptyCounts();
-  // 目1のカードは Strike 1 と Pierce 1 の2種類。合わせて上限4枚。
+  // 目1のカードは種類を問わず合わせて上限4枚。
   for (let index = 0; index < DECK_RULES.MAX_PER_DIE_VALUE; index += 1) {
-    counts = addCard(counts, index % 2 ? "pierce_1" : "strike_1");
+    counts = addCard(counts, index % 2 ? "pierce_1" : "brace_1");
   }
   assert.equal(summarizeDeck(counts).byDie[1], DECK_RULES.MAX_PER_DIE_VALUE);
-  assert.equal(canAddCard(counts, "strike_1"), false);
+  assert.equal(canAddCard(counts, "brace_1"), false);
   assert.equal(canAddCard(counts, "pierce_1"), false);
   assert.equal(canAddCard(counts, "heavy_6"), true);
 });
@@ -76,4 +76,12 @@ test("a deck with no attack cards is rejected", () => {
   const result = validateDeck(counts);
   assert.equal(result.valid, false);
   assert.equal(result.summary.attackCount, 0);
+});
+
+test("defense cards are counted apart from attacks and do not drag the attack average", () => {
+  const counts = { ...createEmptyCounts(), brace_1: 2, heavy_6: 2 };
+  const summary = summarizeDeck(counts);
+  assert.equal(summary.defenseCount, 2);
+  assert.equal(summary.attackCount, 2);
+  assert.equal(summary.averageAttack, 25);
 });

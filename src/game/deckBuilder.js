@@ -1,6 +1,6 @@
 import { CARD_BY_KEY, CARD_CATALOGUE } from "../data/cards.js";
 import { DECK_RULES } from "../data/constants.js";
-import { isTacticalCard, isWildCard } from "./abilityLogic.js";
+import { isDefenseCard, isTacticalCard, isWildCard } from "./abilityLogic.js";
 
 /** 目の上限を数えるときの区分。ワイルドは目を持たないので別枠にする。 */
 export function dieBucket(definition) {
@@ -16,6 +16,7 @@ export function summarizeDeck(counts) {
   let total = 0;
   let attackCount = 0;
   let tacticalCount = 0;
+  let defenseCount = 0;
   let totalCost = 0;
   let totalAttack = 0;
 
@@ -26,6 +27,7 @@ export function summarizeDeck(counts) {
     total += count;
     totalCost += definition.cost * count;
     if (isTacticalCard(definition)) tacticalCount += count;
+    else if (isDefenseCard(definition)) defenseCount += count;
     else {
       attackCount += count;
       totalAttack += definition.attack * count;
@@ -37,6 +39,7 @@ export function summarizeDeck(counts) {
     byDie,
     attackCount,
     tacticalCount,
+    defenseCount,
     averageCost: total ? totalCost / total : 0,
     averageAttack: attackCount ? totalAttack / attackCount : 0,
   };

@@ -14,7 +14,7 @@ import { isTacticalCard, isWildCard } from "../src/game/abilityLogic.js";
 import { evaluateHandRole } from "../src/game/roleLogic.js";
 import { createInitialGameState } from "../src/game/gameState.js";
 import { CPU_ACTION_PATTERN } from "../src/data/enemies.js";
-import { getCpuIntent } from "../src/game/enemyLogic.js";
+import { cpuActionDamage, getCpuIntent } from "../src/game/enemyLogic.js";
 
 test("the default deck is a legal twenty-card build", () => {
   const deck = createDemoDeck();
@@ -88,6 +88,7 @@ test("CPU attacks, points recover with a max of ten, and turn advances", () => {
   const engine = new BattleEngine(state);
 
   const intent = getCpuIntent(engine.state.cpu);
+  assert.equal(intent.type, "ATTACK");
 
   assert.equal(engine.startCpuTurn(), true);
   assert.equal(engine.state.player.hp, GAME_CONFIG.PLAYER_MAX_HP - intent.value);
@@ -412,6 +413,61 @@ test("the CPU performs exactly the announced action, then announces the next one
 });
 
 test("one loop of the CPU pattern deals the same total as fourteen per turn", () => {
-  const total = CPU_ACTION_PATTERN.reduce((sum, action) => sum + action.value, 0);
-  assert.equal(total, 14 * CPU_ACTION_PATTERN.length);
+  const state = createInitialGameState(() => 0.5);
+  const engine = new BattleEngine(state);
+  state.player.hp = 10_000;
+
+  for (let i = 0; i < CPU_ACTION_PATTERN.length; i += 1) {
+    state.phase = PHASES.PLAYER_ATTACK;
+    engine.startCpuTurn();
+    engine.finishTurn();
+  }
+
+  assert.equal(10_000 - state.player.hp, 14 * CPU_ACTION_PATTERN.length);
+  assert.equal(state.cpu.charge, 0);
+});
+
+test("CHARGE deals no damage and adds to the next attack, which then resets it", () => {
+  const state = createInitialGameState(() => 0.5);
+  state.cpu.actionPattern = [
+    { type: "CHARGE", value: 7 },
+    { type: "CHARGE", value: 3 },
+    { type: "ATTACK", value: 5 },
+  ];
+  const engine = new BattleEngine(state);
+  const hpBefore = state.player.hp;
+
+  for (const expectedCharge of [7, 10]) {
+    state.phase = PHASES.PLAYER_ATTACK;
+    engine.startCpuTurn();
+    assert.equal(state.player.hp, hpBefore);
+    assert.equal(state.cpu.charge, expectedCharge);
+    engine.finishTurn();
+  }
+
+  state.phase = PHASES.PLAYER_ATTACK;
+  engine.startCpuTurn();
+  assert.equal(state.player.hp, hpBefore - 15);
+  assert.equal(state.cpu.charge, 0);
+  assert.equal(state.lastCpuAttack.charge, 10);
+  assert.equal(state.lastCpuAttack.incoming, 15);
+});
+
+test("shield absorbs a charged attack using its full damage", () => {
+  const engine = engineWithHand([shieldCard(), card("a", 4), card("b", 4)]);
+  engine.state.cpu.actionPattern = [{ type: "ATTACK", value: 22 }];
+  engine.state.cpu.charge = 10;
+  engine.playTacticalCard("guard", []);
+  engine.state.phase = PHASES.PLAYER_ATTACK;
+  const hpBefore = engine.state.player.hp;
+
+  engine.startCpuTurn();
+
+  assert.equal(engine.state.player.hp, hpBefore - (32 - 14));
+  assert.equal(engine.state.lastCpuAttack.absorbed, 14);
+});
+
+test("CPU action damage only counts charge on attacks", () => {
+  assert.equal(cpuActionDamage({ type: "ATTACK", value: 22 }, 10), 32);
+  assert.equal(cpuActionDamage({ type: "CHARGE", value: 10 }, 10), 0);
 });

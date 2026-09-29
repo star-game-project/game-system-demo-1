@@ -29,6 +29,7 @@ export function createInitialGameState(random = Math.random, deckCards = null) {
       maxHp: GAME_CONFIG.CPU_MAX_HP,
       actionPattern: CPU_ACTION_PATTERN,
       actionIndex: 0,
+      charge: 0,
     },
     selectedCardId: null,
     currentRole: evaluateHandRole(openingDraw.drawn),

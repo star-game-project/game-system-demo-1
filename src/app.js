@@ -124,7 +124,8 @@ function renderCpuIntent(cpu) {
     .join(" → ");
   return `
     <div class="cpu-intent">
-      <span>NEXT ACTION</span><strong>${cpuActionLabel(getCpuIntent(cpu))}</strong>
+      <span>NEXT ACTION</span><strong>${cpuActionLabel(getCpuIntent(cpu), cpu.charge)}</strong>
+      <span>CHARGE ${cpu.charge}</span>
       <small>PATTERN ${cpu.actionIndex + 1}/${cpu.actionPattern.length}: ${pattern} → (loop)</small>
     </div>
   `;
@@ -174,7 +175,7 @@ function getCenterDisplay(state) {
   if (state.phase === PHASES.CPU_ATTACK || state.phase === PHASES.DEFEAT) {
     const hit = state.lastCpuAttack;
     return {
-      kicker: `ENEMY ${cpuActionLabel(hit.action)}`,
+      kicker: `ENEMY ${cpuActionLabel(hit.action, hit.charge)}`,
       multiplier: hit.absorbed ? `SHIELD −${hit.absorbed}` : "",
       value: `${hit.taken}`,
       unit: "DAMAGE TAKEN",

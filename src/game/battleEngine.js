@@ -2,7 +2,7 @@ import { GAME_CONFIG, PHASES } from "../data/constants.js";
 import { drawWithRecycle } from "./deckLogic.js";
 import { evaluateHandRole } from "./roleLogic.js";
 import { calculateAttack } from "./damageLogic.js";
-import { advanceCpuAction, getCpuIntent } from "./enemyLogic.js";
+import { advanceCpuAction, cpuActionDamage, getCpuIntent } from "./enemyLogic.js";
 import {
   createTemporaryEffects,
   isTacticalCard,
@@ -240,13 +240,22 @@ export class BattleEngine {
     const action = getCpuIntent(cpu);
     advanceCpuAction(cpu);
 
-    const incoming = action.value;
+    if (action.type === "CHARGE") {
+      cpu.charge += action.value;
+      this.state.lastCpuAttack = { action, charge: 0, incoming: 0, absorbed: 0, taken: 0 };
+      this.state.battleMessage = `CPUは力を溜めている。次の攻撃 +${cpu.charge}。`;
+      return true;
+    }
+
+    const charge = cpu.charge;
+    const incoming = cpuActionDamage(action, charge);
     const absorbed = Math.min(player.shield, incoming);
     const taken = incoming - absorbed;
 
+    cpu.charge = 0;
     player.shield -= absorbed;
     player.hp = Math.max(0, player.hp - taken);
-    this.state.lastCpuAttack = { action, incoming, absorbed, taken };
+    this.state.lastCpuAttack = { action, charge, incoming, absorbed, taken };
 
     this.state.battleMessage = absorbed
       ? `CPUの反撃。シールドが${absorbed}吸収し、${taken}ダメージを受けました。`

@@ -4,11 +4,13 @@
  *
  * ATTACK n: n + 溜め込み分のダメージを与え、溜め込みを0に戻す。
  * CHARGE n: 攻撃せず、次の ATTACK のダメージを n 上げる。
+ * BLOCK n: 攻撃せず、直後のプレイヤーターン中に受けるダメージを合計 n まで防ぐ。
  *
- * 1周の合計は 42（旧仕様の 14 × 3ターン）に揃え、難易度を変えずに強弱だけを付けている。
+ * 1周の与ダメージ合計は 56（旧仕様の 14 × 4ターン）に揃え、平均を変えずに強弱だけを付けている。
  */
 export const CPU_ACTION_PATTERN = Object.freeze([
-  Object.freeze({ type: "ATTACK", value: 10 }),
-  Object.freeze({ type: "CHARGE", value: 10 }),
-  Object.freeze({ type: "ATTACK", value: 22 }),
+  Object.freeze({ type: "ATTACK", value: 14 }),
+  Object.freeze({ type: "CHARGE", value: 14 }),
+  Object.freeze({ type: "ATTACK", value: 28 }),
+  Object.freeze({ type: "BLOCK", value: 30 }),
 ]);

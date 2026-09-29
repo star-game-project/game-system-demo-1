@@ -471,3 +471,67 @@ test("CPU action damage only counts charge on attacks", () => {
   assert.equal(cpuActionDamage({ type: "ATTACK", value: 22 }, 10), 32);
   assert.equal(cpuActionDamage({ type: "CHARGE", value: 10 }, 10), 0);
 });
+
+test("CPU block soaks player damage across attacks until it runs out", () => {
+  const engine = engineWithHand([
+    doubleTapCard(),
+    card("a", 4, { attack: 20 }),
+    card("b", 5, { attack: 20 }),
+    card("c", 6, { attack: 20 }),
+  ]);
+  engine.state.cpu.block = 30;
+  engine.playTacticalCard("double", []);
+  const hpBefore = engine.state.cpu.hp;
+
+  engine.selectCard("a");
+  const preview = engine.getAttackPreview();
+  assert.equal(preview.blocked, Math.min(30, preview.finalAttack));
+  assert.equal(engine.state.cpu.block, 30, "a preview must not spend the block");
+
+  const first = engine.useSelectedCard();
+  assert.equal(first.blocked, Math.min(30, first.finalAttack));
+  assert.equal(engine.state.cpu.hp, hpBefore - first.dealt);
+  assert.match(engine.state.battleMessage, /ブロック/);
+
+  engine.selectCard("b");
+  const second = engine.useSelectedCard();
+  assert.equal(second.blocked, Math.min(30 - first.blocked, second.finalAttack));
+  assert.equal(second.dealt, second.finalAttack - second.blocked);
+  assert.equal(engine.state.cpu.hp, hpBefore - first.dealt - second.dealt);
+});
+
+test("BLOCK deals no damage, lasts one player turn, and clears when the CPU acts again", () => {
+  const state = createInitialGameState(() => 0.5);
+  state.cpu.actionPattern = [
+    { type: "BLOCK", value: 30 },
+    { type: "ATTACK", value: 5 },
+  ];
+  const engine = new BattleEngine(state);
+  const hpBefore = state.player.hp;
+
+  state.phase = PHASES.PLAYER_ATTACK;
+  engine.startCpuTurn();
+  assert.equal(state.player.hp, hpBefore);
+  assert.equal(state.cpu.block, 30);
+
+  engine.finishTurn();
+  assert.equal(state.cpu.block, 30, "the block covers the following player turn");
+
+  state.phase = PHASES.PLAYER_ATTACK;
+  engine.startCpuTurn();
+  assert.equal(state.cpu.block, 0);
+  assert.equal(state.player.hp, hpBefore - 5);
+});
+
+test("a fully blocked attack cannot win the battle", () => {
+  const engine = engineWithHand([card("a", 4, { attack: 10 }), card("b", 5)]);
+  engine.state.cpu.hp = 1;
+  engine.state.cpu.block = 1000;
+
+  engine.selectCard("a");
+  const result = engine.useSelectedCard();
+
+  assert.equal(result.dealt, 0);
+  assert.equal(engine.state.cpu.hp, 1);
+  assert.equal(engine.state.phase, PHASES.PLAYER_ATTACK);
+});

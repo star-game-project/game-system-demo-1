@@ -278,13 +278,19 @@ Temporary Bonus +5   （前ターンの Boost 2 による）
       <p>次に実行する行動（<b>行動予告</b>）と、パターン全体・現在位置は常に画面に表示される。予告された行動がそのまま実行される。</p>
       <pre><code>intent = cpu.actionPattern[cpu.actionIndex]
 cpu.actionIndex = (cpu.actionIndex + 1) % cpu.actionPattern.length</code></pre>
-      <p>現在のパターンは <code>ATTACK 10 → CHARGE +10 → ATTACK 22</code> の3ターン周期。3ターン目の攻撃は溜め込み分が乗って <b>32</b> になる。1周の合計は42で、毎ターン14ダメージだった旧仕様と平均は同じにしてある。</p>
-      <p>CPUが攻撃しないターン（CHARGE）はシールドが無駄になるため、そのターンは防御を捨てて攻めに回せる。溜め込みの現在値は常に表示され、次の ATTACK の予告にも合計が含まれる。</p>
+      <p>現在のパターンは <code>ATTACK 14 → CHARGE +14 → ATTACK 28 → BLOCK 30</code> の4ターン周期。3ターン目の攻撃は溜め込み分が乗って <b>42</b> になる。1周の与ダメージ合計は56で、毎ターン14ダメージだった旧仕様と平均は同じにしてある。</p>
+      <p><b>ブロック</b>は、CPUが行動するたびに（行動の解決前に）0へ戻す。つまり BLOCK の効果は直後のプレイヤーターン1回限り。そのターン中は複数回の攻撃（追加攻撃）で共有して削られる。プレイヤーの攻撃は次のように解決する。攻撃プレビューもブロック分を含めて表示する（プレビューではブロックを消費しない）。</p>
+      <pre><code>blocked = Math.min(cpu.block, finalAttack)
+dealt   = finalAttack - blocked
+cpu.block -= blocked
+cpu.hp  -= dealt</code></pre>
+      <p>CPUが攻撃しないターン（CHARGE・BLOCK）はシールドが無駄になるため、そのターンは防御を捨てて攻めに回せる。ブロック中のターンは、攻撃を控えて Boost（次ターン攻撃力アップ）などの準備に回す判断もある。溜め込みの現在値は常に表示され、次の ATTACK の予告にも合計が含まれる。</p>
       <div class="docs-table-wrap"><table>
         <thead><tr><th>行動</th><th>効果</th></tr></thead>
         <tbody>
           <tr><td><code>ATTACK n</code></td><td><code>n + cpu.charge</code> のダメージ。シールドで吸収した残りを <code>player.hp</code> から引き、<code>cpu.charge</code> を0に戻す</td></tr>
           <tr><td><code>CHARGE n</code></td><td>攻撃しない。<code>cpu.charge += n</code></td></tr>
+          <tr><td><code>BLOCK n</code></td><td>攻撃しない。<code>cpu.block = n</code>。直後のプレイヤーターン中、プレイヤーの攻撃を合計 n まで防ぐ</td></tr>
         </tbody>
       </table></div>
     </section>
@@ -317,6 +323,7 @@ cpu.actionIndex = (cpu.actionIndex + 1) % cpu.actionPattern.length</code></pre>
     actionPattern: CpuAction[];   // 先頭から順に実行し、ループする
     actionIndex: number;          // 次に実行する行動（予告）の位置
     charge: number;               // CHARGE で溜めた、次の ATTACK への上乗せ分
+    block: number;                // BLOCK の残量。CPUが次に行動するとき0に戻る
   };
 
   selectedCardId: string | null;

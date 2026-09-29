@@ -91,7 +91,16 @@ export class BattleEngine {
   getAttackPreview(cardId = this.state.selectedCardId) {
     const card = this.state.player.hand.find((item) => item.id === cardId);
     if (!card) return null;
-    return calculateAttack(card, this.state.player.hand, this.state.player, this.state.turn);
+    const attack = calculateAttack(card, this.state.player.hand, this.state.player, this.state.turn);
+    return { ...attack, ...this.applyCpuBlock(attack.finalAttack, false) };
+  }
+
+  /** CPUのブロックで攻撃を減らす。commit が false のときはブロックを消費しない。 */
+  applyCpuBlock(damage, commit = true) {
+    const { cpu } = this.state;
+    const blocked = Math.min(cpu.block, damage);
+    if (commit) cpu.block -= blocked;
+    return { blocked, dealt: damage - blocked };
   }
 
   hasPlayableAttackCard() {
@@ -201,11 +210,18 @@ export class BattleEngine {
       this.state.turn,
     );
 
+    const { blocked, dealt } = this.applyCpuBlock(attack.finalAttack);
+    attack.blocked = blocked;
+    attack.dealt = dealt;
+    const damageText = blocked
+      ? `${dealt}ダメージ（ブロック −${blocked}）`
+      : `${dealt}ダメージ`;
+
     this.state.player.point = Math.max(0, this.state.player.point - card.cost);
     this.state.player.temporaryEffects.push(
       ...createTemporaryEffects(card, this.state.turn),
     );
-    this.state.cpu.hp = Math.max(0, this.state.cpu.hp - attack.finalAttack);
+    this.state.cpu.hp = Math.max(0, this.state.cpu.hp - dealt);
     this.state.player.hand = this.state.player.hand.filter((item) => item.id !== card.id);
     this.state.player.discardPile.push(card);
     this.state.player.cardsPlayed += 1;
@@ -214,7 +230,7 @@ export class BattleEngine {
     this.state.selectedCardId = null;
 
     if (this.state.cpu.hp <= 0) {
-      this.state.battleMessage = `${card.name} — ${attack.finalAttack}ダメージ！`;
+      this.state.battleMessage = `${card.name} — ${damageText}！`;
       this.state.phase = PHASES.VICTORY;
       return attack;
     }
@@ -222,12 +238,12 @@ export class BattleEngine {
     // 追加攻撃が残っている間はターンを終了せず、カード選択に留まる。
     if (this.state.player.extraAttacks > 0) {
       this.state.player.extraAttacks -= 1;
-      this.state.battleMessage = `${card.name} — ${attack.finalAttack}ダメージ！ 続けてあと${this.state.player.extraAttacks + 1}回攻撃できます。`;
+      this.state.battleMessage = `${card.name} — ${damageText}！ 続けてあと${this.state.player.extraAttacks + 1}回攻撃できます。`;
       this.state.phase = PHASES.CARD_SELECT;
       return attack;
     }
 
-    this.state.battleMessage = `${card.name} — ${attack.finalAttack}ダメージ！`;
+    this.state.battleMessage = `${card.name} — ${damageText}！`;
     this.state.phase = PHASES.PLAYER_ATTACK;
     return attack;
   }
@@ -239,6 +255,16 @@ export class BattleEngine {
     const { player, cpu } = this.state;
     const action = getCpuIntent(cpu);
     advanceCpuAction(cpu);
+
+    // ブロックは直後のプレイヤーターン限り。CPUが次に行動する時点で消える。
+    cpu.block = 0;
+
+    if (action.type === "BLOCK") {
+      cpu.block = action.value;
+      this.state.lastCpuAttack = { action, charge: 0, incoming: 0, absorbed: 0, taken: 0 };
+      this.state.battleMessage = `CPUは防御態勢。次のあなたのターン、合計${cpu.block}ダメージまで防ぎます。`;
+      return true;
+    }
 
     if (action.type === "CHARGE") {
       cpu.charge += action.value;

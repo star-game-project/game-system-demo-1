@@ -30,6 +30,7 @@ export function createInitialGameState(random = Math.random, deckCards = null) {
       actionPattern: CPU_ACTION_PATTERN,
       actionIndex: 0,
       charge: 0,
+      block: 0,
     },
     selectedCardId: null,
     currentRole: evaluateHandRole(openingDraw.drawn),

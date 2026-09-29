@@ -21,5 +21,6 @@ export function cpuActionLabel(action, charge = 0) {
       : `ATTACK ${action.value}`;
   }
   if (action.type === "CHARGE") return `CHARGE +${action.value}`;
+  if (action.type === "BLOCK") return `BLOCK ${action.value}`;
   return action.type;
 }

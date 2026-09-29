@@ -126,6 +126,7 @@ function renderCpuIntent(cpu) {
     <div class="cpu-intent">
       <span>NEXT ACTION</span><strong>${cpuActionLabel(getCpuIntent(cpu), cpu.charge)}</strong>
       <span>CHARGE ${cpu.charge}</span>
+      <span>BLOCK ${cpu.block}</span>
       <small>PATTERN ${cpu.actionIndex + 1}/${cpu.actionPattern.length}: ${pattern} → (loop)</small>
     </div>
   `;
@@ -166,8 +167,8 @@ function getCenterDisplay(state) {
     return {
       kicker: roleNameLabel(attack) || "DIRECT HIT",
       multiplier: attack?.roleName ? multiplierLabel(attack.roleMultiplier) : "",
-      value: attack ? `${attack.finalAttack}` : "0",
-      unit: "DAMAGE",
+      value: attack ? `${attack.dealt}` : "0",
+      unit: attack?.blocked ? `DAMAGE (${attack.finalAttack} − BLOCK ${attack.blocked})` : "DAMAGE",
       className: "combat-readout--player-hit",
     };
   }
@@ -255,6 +256,10 @@ function renderPreview(state) {
           <span>FINAL DAMAGE</span>
           <strong>${preview?.finalAttack ?? "—"}</strong>
         </div>
+        <dl class="damage-formula">
+          <div><dt>ENEMY BLOCK</dt><dd>${preview ? `−${preview.blocked}` : `${state.cpu.block}`}</dd></div>
+          <div><dt>DEALT</dt><dd>${preview?.dealt ?? "—"}</dd></div>
+        </dl>
         ${selected ? `<div class="selected-abilities">${abilityLabel(selected)}</div>` : `<p class="preview-hint">手札を選ぶと、常在効果と役を含む最終ダメージを確認できます。</p>`}
       </div>
       <div class="role-guide">

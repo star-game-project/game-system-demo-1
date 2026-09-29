@@ -9,15 +9,24 @@ export function createTurnTotals() {
   return { cards: 0, dealt: 0, blocked: 0, shield: 0 };
 }
 
-export function createInitialGameState(random = Math.random, deckCards = null) {
+/**
+ * 戦闘の初期状態。連戦では battle（何戦目か）と playerHp（前の戦闘の残りHP）を引き継ぐ。
+ * それ以外（山札・ポイント・CPU）は毎戦リセットする。
+ */
+export function createInitialGameState(
+  random = Math.random,
+  deckCards = null,
+  { battle = 1, playerHp = GAME_CONFIG.PLAYER_MAX_HP } = {},
+) {
   const shuffled = shuffleDeck(deckCards ?? createDemoDeck(), random);
   const openingDraw = drawCards(shuffled, GAME_CONFIG.START_HAND_SIZE);
 
   return {
+    battle,
     turn: 1,
     phase: PHASES.DRAW_SELECT,
     player: {
-      hp: GAME_CONFIG.PLAYER_MAX_HP,
+      hp: playerHp,
       maxHp: GAME_CONFIG.PLAYER_MAX_HP,
       point: GAME_CONFIG.START_POINT,
       maxPoint: GAME_CONFIG.MAX_POINT,

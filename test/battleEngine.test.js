@@ -614,3 +614,21 @@ test("turn totals add up every card played and reset next turn", () => {
   engine.finishTurn();
   assert.deepEqual(engine.state.turnTotals, { cards: 0, dealt: 0, blocked: 0, shield: 0 });
 });
+
+test("a new battle in a run carries over the battle count and remaining HP only", () => {
+  const state = createInitialGameState(() => 0.5, null, { battle: 3, playerHp: 42 });
+
+  assert.equal(state.battle, 3);
+  assert.equal(state.player.hp, 42);
+  assert.equal(state.player.maxHp, GAME_CONFIG.PLAYER_MAX_HP);
+  assert.equal(state.player.point, GAME_CONFIG.START_POINT);
+  assert.equal(state.cpu.hp, GAME_CONFIG.CPU_MAX_HP);
+  assert.equal(state.cpu.actionIndex, 0);
+  assert.equal(state.turn, 1);
+});
+
+test("a fresh run starts at battle one with full HP", () => {
+  const state = createInitialGameState(() => 0.5);
+  assert.equal(state.battle, 1);
+  assert.equal(state.player.hp, GAME_CONFIG.PLAYER_MAX_HP);
+});

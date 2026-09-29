@@ -42,11 +42,12 @@ let engine = null;
 // 戦術カードの対象選択中だけ保持する UI 状態。
 let pendingTactical = null;
 
-function startBattle() {
+/** carry を渡すと連戦として、何戦目かと残りHPを引き継ぐ。 */
+function startBattle(carry = {}) {
   clearTimers();
   pendingTactical = null;
   engine = new BattleEngine(
-    createInitialGameState(Math.random, createDeckFromCounts(deckCounts)),
+    createInitialGameState(Math.random, createDeckFromCounts(deckCounts), carry),
   );
   screen = SCREENS.BATTLE;
 }
@@ -466,15 +467,20 @@ function renderResult(state) {
         <span class="result-dialog__mark">${victory ? "◆" : "×"}</span>
         <span class="eyebrow">${victory ? "TARGET ELIMINATED" : "UNIT DISABLED"}</span>
         <h2 id="result-title">${victory ? "YOU WIN" : "GAME OVER"}</h2>
-        <p>${victory ? `${state.turn}ターンでCPUを撃破しました。` : `CPUの攻撃に敗れました。戦術を組み直しましょう。`}</p>
+        <p>${victory ? `${state.turn}ターンでCPUを撃破しました。HPは${state.player.hp}のまま次の戦闘へ進みます。` : `${state.battle}戦目で敗れました（突破 ${state.battle - 1}戦）。`}</p>
         <div class="result-stats">
+          <span><small>BATTLE</small><b>${state.battle}</b></span>
           <span><small>TURN</small><b>${state.turn}</b></span>
           <span><small>CARDS USED</small><b>${state.player.cardsPlayed}</b></span>
           <span><small>HP LEFT</small><b>${state.player.hp}</b></span>
         </div>
         <div class="result-actions">
           <button class="command-button command-button--secondary" data-action="edit-deck">EDIT DECK</button>
-          <button class="command-button command-button--primary" data-action="restart">REMATCH</button>
+          ${
+            victory
+              ? `<button class="command-button command-button--primary" data-action="next-battle">NEXT BATTLE</button>`
+              : `<button class="command-button command-button--primary" data-action="restart">RETRY FROM #001</button>`
+          }
         </div>
       </div>
     </div>
@@ -647,11 +653,11 @@ function render() {
           <span class="brand__mark"><i>D<small>6</small></i></span>
           <span><strong>DICE HAND</strong><small>TACTICAL CARD BATTLE</small></span>
         </a>
-        <div class="topbar__center"><span>BATTLE</span><strong>#001</strong></div>
+        <div class="topbar__center"><span>BATTLE</span><strong>#${String(state.battle).padStart(3, "0")}</strong></div>
         <div class="topbar__actions">
           <button class="icon-button" data-action="show-roles" aria-label="役一覧" title="役一覧">役</button>
           <button class="icon-button" data-action="edit-deck" aria-label="デッキを編集" title="デッキを編集">☰</button>
-          <button class="icon-button" data-action="restart" aria-label="同じデッキで再戦" title="同じデッキで再戦">↻</button>
+          <button class="icon-button" data-action="restart" aria-label="1戦目からやり直す" title="1戦目からやり直す">↻</button>
         </div>
       </header>
 
@@ -804,6 +810,10 @@ function bindEvents() {
         clearTimers();
         cancelTargeting();
         screen = SCREENS.DECK_BUILD;
+        render();
+      }
+      if (action === "next-battle" && engine.state.phase === PHASES.VICTORY) {
+        startBattle({ battle: engine.state.battle + 1, playerHp: engine.state.player.hp });
         render();
       }
       if (action === "restart") {

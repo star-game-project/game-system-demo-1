@@ -303,12 +303,22 @@ cpu.hp  -= dealt</code></pre>
         <li>プレイヤーの攻撃後にCPU HPが0以下 → <b>YOU WIN</b>（CPUターンへ進まず終了）</li>
         <li>CPUの攻撃後にプレイヤーHPが0以下 → <b>GAME OVER</b></li>
       </ul>
-      <p>HPは0未満にならない。戦闘終了後は操作できず、<b>REMATCH</b>（同じデッキで再戦）または <b>EDIT DECK</b>（構築に戻る）を選ぶ。</p>
+      <p>HPは0未満にならない。</p>
+
+      <h3>11.1 連戦</h3>
+      <p>勝利すると <b>NEXT BATTLE</b> で次の戦闘に進む。何戦目かは画面上部に <code>BATTLE #002</code> のように表示する。</p>
+      <ul>
+        <li><b>引き継ぐもの</b>：プレイヤーの残りHP（回復しない）</li>
+        <li><b>リセットするもの</b>：山札（デッキから作り直してシャッフル）・ポイント・シールド・ターン数・CPU（HP・行動パターンの位置・溜め込み・ブロック）</li>
+        <li>CPUは毎戦同じ（HP・行動パターンとも変わらない）</li>
+      </ul>
+      <p>敗北すると <b>RETRY FROM #001</b> で1戦目からやり直す。敗北画面には何戦目で敗れたかを表示する。<b>EDIT DECK</b> で構築に戻った場合も、次の戦闘は1戦目から始まる。</p>
     </section>
 
     <section id="state">
       <h2>12. 状態</h2>
       <pre><code>type GameState = {
+  battle: number;               // 連戦の何戦目か（1始まり）
   turn: number;
   phase: GamePhase;
 

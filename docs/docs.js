@@ -113,9 +113,6 @@ function tacticalText(ability) {
   if (ability.type === "GAIN_SHIELD") {
     return `シールドを ${ability.value} 得る（次のCPU攻撃を吸収）`;
   }
-  if (ability.type === "GRANT_EXTRA_ATTACK") {
-    return `このターン、攻撃回数を ${ability.value} 増やす`;
-  }
   return ability.type;
 }
 
@@ -187,8 +184,8 @@ table(
   ["フェーズ", "表示", "内容"],
   [
     [PHASES.DRAW_SELECT, "DRAW / SKIP を選ぶ"],
-    [PHASES.CARD_SELECT, "戦術カードの使用と、攻撃カードの選択"],
-    [PHASES.PLAYER_ATTACK, "プレイヤーの攻撃の解決"],
+    [PHASES.CARD_SELECT, "カードを何枚でも使う（END TURN まで）"],
+    [PHASES.PLAYER_ATTACK, "プレイヤーのターン終了（このターンの合計を表示）"],
     [PHASES.CPU_ATTACK, "CPUの攻撃"],
     [PHASES.POINT_RECOVERY, "ポイント回復と手札の引き直し"],
     [PHASES.VICTORY, "プレイヤーの勝利"],

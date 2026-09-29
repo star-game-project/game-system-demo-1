@@ -62,7 +62,6 @@ function tacticalLabel(ability) {
   if (ability.type === "HAND_POSITION_SWAP") return "2枚の位置を入替";
   if (ability.type === "REDRAW_CARD") return "1枚捨てて引く";
   if (ability.type === "GAIN_SHIELD") return `シールド +${ability.value}`;
-  if (ability.type === "GRANT_EXTRA_ATTACK") return "このターン追加で1回攻撃";
   return "TACTICAL";
 }
 
@@ -156,28 +155,26 @@ function statusPanel(entity, label, modifier = "") {
   `;
 }
 
+/** このターンに使ったカードの合計。 */
+function turnTotalsLabel(totals) {
+  const blocked = totals.blocked ? ` (BLOCK −${totals.blocked})` : "";
+  return `THIS TURN: ${totals.cards} CARDS · DMG ${totals.dealt}${blocked} · SHIELD +${totals.shield}`;
+}
+
 function getCenterDisplay(state) {
-  if (state.phase === PHASES.PLAYER_ATTACK && state.lastDefense) {
+  if (state.phase === PHASES.PLAYER_ATTACK) {
+    const totals = state.turnTotals;
     return {
-      kicker: `DEFEND — ${state.lastDefense.cardName}`,
-      multiplier: "",
-      value: `+${state.lastDefense.shield}`,
-      unit: `SHIELD (TOTAL ${state.player.shield})`,
-      className: "",
+      kicker: totals.cards ? "TURN TOTAL" : "NO CARD PLAYED",
+      multiplier: totals.shield ? `SHIELD +${totals.shield}` : "",
+      value: `${totals.dealt}`,
+      unit: totals.blocked ? `DAMAGE (BLOCK −${totals.blocked})` : "DAMAGE",
+      className: totals.dealt ? "combat-readout--player-hit" : "",
     };
   }
 
-  if (state.phase === PHASES.PLAYER_ATTACK || state.phase === PHASES.VICTORY) {
+  if (state.phase === PHASES.VICTORY) {
     const attack = state.lastAttack;
-    if (!attack) {
-      return {
-        kicker: "NO CARD PLAYED",
-        multiplier: "",
-        value: "—",
-        unit: "TURN END",
-        className: "",
-      };
-    }
     return {
       kicker: roleNameLabel(attack) || "DIRECT HIT",
       multiplier: attack?.roleName ? multiplierLabel(attack.roleMultiplier) : "",
@@ -226,6 +223,7 @@ function renderCenter(state) {
         <span class="combat-readout__unit">${display.unit}</span>
       </div>
       <p class="battle-message">${state.battleMessage}</p>
+      ${state.phase === PHASES.CARD_SELECT && state.turnTotals.cards ? `<p class="battle-message">${turnTotalsLabel(state.turnTotals)}</p>` : ""}
     </section>
   `;
 }
@@ -305,7 +303,6 @@ function renderPoints(state) {
         <span><i class="deck-icon"></i>DECK <b>${state.player.deck.length}</b></span>
         <span><i class="discard-icon"></i>DISCARD <b>${state.player.discardPile.length}</b></span>
         ${state.player.shield ? `<span class="buff-chip buff-chip--shield">SHIELD ${state.player.shield}</span>` : ""}
-        ${state.player.extraAttacks ? `<span class="buff-chip buff-chip--extra">攻撃 あと${state.player.extraAttacks + 1}回</span>` : ""}
         ${activeBonus ? `<span class="buff-chip">ATK +${activeBonus} ACTIVE</span>` : ""}
         ${pendingBonus ? `<span class="buff-chip buff-chip--pending">NEXT ATK +${pendingBonus}</span>` : ""}
       </div>
@@ -434,21 +431,20 @@ function renderCommands(state) {
       ? `${selected.name} で${defending ? "防御" : "攻撃"}`
       : canAttack
         ? "使用するカードを選択"
-        : "攻撃できるカードがありません";
+        : "使えるカードがありません";
     const detail = selected
       ? defending
-        ? `シールド +${selected.defense} を得てターンを終了します（役の倍率は掛かりません）`
+        ? `シールド +${selected.defense}（役の倍率は掛かりません）`
         : "使用前の手札で役を判定します"
-      : canAttack
-        ? "戦術カードは攻撃せず手札を操作します（ターンは終了しません）"
-        : "戦術カードで手札を整えるか、ターンを終了しましょう";
+      : "ポイントが続く限り何枚でも使えます。終わったら END TURN";
     return `
       <div class="command-copy">
         <span class="command-step">02 / 02</span>
         <div><strong>${headline}</strong><small>${detail}</small></div>
       </div>
       <div class="command-actions">
-        ${!canAttack ? `<button class="command-button command-button--danger" data-action="end-turn">END TURN</button>` : `<button class="command-button command-button--attack" data-action="attack" ${selected ? "" : "disabled"}><span>EXECUTE</span><small>${defending ? "DEFEND" : "ATTACK"}</small></button>`}
+        <button class="command-button command-button--danger" data-action="end-turn">END TURN</button>
+        <button class="command-button command-button--attack" data-action="attack" ${selected ? "" : "disabled"}><span>EXECUTE</span><small>${defending ? "DEFEND" : "ATTACK"}</small></button>
       </div>
     `;
   }
@@ -785,9 +781,10 @@ function bindEvents() {
       }
       if (action === "attack" && engine.useSelectedCard()) {
         cancelTargeting();
-        proceedAfterPlayerAction();
+        // ターンは続く。勝利したときだけ結果を表示する。
+        render();
       }
-      if (action === "end-turn" && engine.endTurnWithoutCard()) {
+      if (action === "end-turn" && engine.endTurn()) {
         cancelTargeting();
         proceedAfterPlayerAction();
       }

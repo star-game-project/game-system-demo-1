@@ -4,6 +4,11 @@ import { CPU_ACTION_PATTERN } from "../data/enemies.js";
 import { drawCards, shuffleDeck } from "./deckLogic.js";
 import { evaluateHandRole } from "./roleLogic.js";
 
+/** 1ターン中に使ったカードの合計。ターン開始時に作り直す。 */
+export function createTurnTotals() {
+  return { cards: 0, dealt: 0, blocked: 0, shield: 0 };
+}
+
 export function createInitialGameState(random = Math.random, deckCards = null) {
   const shuffled = shuffleDeck(deckCards ?? createDemoDeck(), random);
   const openingDraw = drawCards(shuffled, GAME_CONFIG.START_HAND_SIZE);
@@ -21,7 +26,6 @@ export function createInitialGameState(random = Math.random, deckCards = null) {
       discardPile: [],
       cardsPlayed: 0,
       shield: 0,
-      extraAttacks: 0,
       temporaryEffects: [],
     },
     cpu: {
@@ -36,6 +40,7 @@ export function createInitialGameState(random = Math.random, deckCards = null) {
     currentRole: evaluateHandRole(openingDraw.drawn),
     lastAttack: null,
     lastDefense: null,
+    turnTotals: createTurnTotals(),
     battleMessage: `${GAME_CONFIG.START_HAND_SIZE}枚のカードをドロー。あなたのターンです。`,
   };
 }

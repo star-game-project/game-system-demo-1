@@ -8,7 +8,6 @@ export const TACTICAL_ABILITIES = Object.freeze({
   REDRAW_CARD: { targetCount: 1 },
   // 対象を取らない効果。選択に入らずその場で解決する。
   GAIN_SHIELD: { targetCount: 0 },
-  GRANT_EXTRA_ATTACK: { targetCount: 0 },
 });
 
 /** 攻撃せずに手札を操作するカードか。 */

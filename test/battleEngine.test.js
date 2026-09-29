@@ -163,6 +163,7 @@ test("cards played is tracked separately from the discard pile", () => {
   engine.useSelectedCard();
   assert.equal(engine.state.player.cardsPlayed, 1);
 
+  engine.endTurn();
   engine.startCpuTurn();
   engine.finishTurn();
   assert.equal(engine.state.player.cardsPlayed, 1);
@@ -297,19 +298,20 @@ test("tactical cards are rejected as attacks and by bad targeting", () => {
   assert.equal(engine.state.player.hand.length, 5);
 });
 
-test("a hand of only tactical cards allows ending the turn", () => {
-  const engine = tacticalEngine();
-  engine.state.player.hand = tacticalHand().filter(isTacticalCard);
-
-  assert.equal(engine.hasPlayableAttackCard(), false);
-  assert.equal(engine.endTurnWithoutCard(), true);
+test("the turn can be ended at any time, with or without playable cards", () => {
+  const engine = engineWithHand([card("a", 4), card("b", 5)]);
+  assert.equal(engine.hasPlayableAttackCard(), true);
+  assert.equal(engine.endTurn(), true);
   assert.equal(engine.state.phase, PHASES.PLAYER_ATTACK);
+
+  const tacticalOnly = tacticalEngine();
+  tacticalOnly.state.player.hand = tacticalHand().filter(isTacticalCard);
+  assert.equal(tacticalOnly.hasPlayableAttackCard(), false);
+  assert.equal(tacticalOnly.endTurn(), true);
 });
 
 const shieldCard = (id = "guard") =>
   card(id, 5, { attack: 0, cost: 2, tacticalAbility: { type: "GAIN_SHIELD", value: 14 } });
-const doubleTapCard = (id = "double") =>
-  card(id, 1, { attack: 0, cost: 3, tacticalAbility: { type: "GRANT_EXTRA_ATTACK", value: 1 } });
 
 test("a zero-target tactical card resolves without needing a target", () => {
   const engine = engineWithHand([shieldCard(), card("a", 4), card("b", 4)]);
@@ -344,45 +346,6 @@ test("leftover shield does not carry into the next turn", () => {
   engine.finishTurn();
 
   assert.equal(engine.state.player.shield, 0);
-});
-
-test("an extra attack keeps the turn open for a second card", () => {
-  const engine = engineWithHand([doubleTapCard(), card("a", 4), card("b", 4)]);
-  engine.playTacticalCard("double", []);
-  assert.equal(engine.state.player.extraAttacks, 1);
-
-  engine.selectCard("a");
-  engine.useSelectedCard();
-  // 1回目の攻撃ではターンが終わらない。
-  assert.equal(engine.state.phase, PHASES.CARD_SELECT);
-  assert.equal(engine.state.player.extraAttacks, 0);
-
-  engine.selectCard("b");
-  engine.useSelectedCard();
-  // 2回目でターンが終わる。
-  assert.equal(engine.state.phase, PHASES.PLAYER_ATTACK);
-  assert.equal(engine.state.player.cardsPlayed, 3);
-});
-
-test("an extra attack still ends the battle the moment the CPU dies", () => {
-  const engine = engineWithHand([doubleTapCard(), card("a", 4), card("b", 4)]);
-  engine.playTacticalCard("double", []);
-  engine.state.cpu.hp = 1;
-
-  engine.selectCard("a");
-  engine.useSelectedCard();
-
-  assert.equal(engine.state.phase, PHASES.VICTORY);
-});
-
-test("unused extra attacks do not carry into the next turn", () => {
-  const engine = engineWithHand([doubleTapCard(), card("a", 4), card("b", 4)]);
-  engine.playTacticalCard("double", []);
-  engine.state.phase = PHASES.PLAYER_ATTACK;
-  engine.startCpuTurn();
-  engine.finishTurn();
-
-  assert.equal(engine.state.player.extraAttacks, 0);
 });
 
 test("the CPU starts at the head of its action pattern", () => {
@@ -475,13 +438,11 @@ test("CPU action damage only counts charge on attacks", () => {
 
 test("CPU block soaks player damage across attacks until it runs out", () => {
   const engine = engineWithHand([
-    doubleTapCard(),
     card("a", 4, { attack: 20 }),
     card("b", 5, { attack: 20 }),
     card("c", 6, { attack: 20 }),
   ]);
   engine.state.cpu.block = 30;
-  engine.playTacticalCard("double", []);
   const hpBefore = engine.state.cpu.hp;
 
   engine.selectCard("a");
@@ -534,13 +495,13 @@ test("a fully blocked attack cannot win the battle", () => {
 
   assert.equal(result.dealt, 0);
   assert.equal(engine.state.cpu.hp, 1);
-  assert.equal(engine.state.phase, PHASES.PLAYER_ATTACK);
+  assert.equal(engine.state.phase, PHASES.CARD_SELECT);
 });
 
 const defenseCard = (id = "brace", overrides = {}) =>
   card(id, 1, { attack: 0, defense: 10, cost: 1, ...overrides });
 
-test("a defense card grants its shield, ignores the role multiplier, and ends the turn", () => {
+test("a defense card grants its shield, ignores the role multiplier, and keeps the turn open", () => {
   // 2,2,2 が揃っていても防御値は倍率の影響を受けない。
   const engine = engineWithHand([
     defenseCard("brace", { dieValue: 2 }),
@@ -557,14 +518,14 @@ test("a defense card grants its shield, ignores the role multiplier, and ends th
   assert.deepEqual(result, { cardName: "brace", shield: 10 });
   assert.equal(engine.state.player.shield, 10);
   assert.equal(engine.state.player.point, pointBefore - 1);
-  assert.equal(engine.state.phase, PHASES.PLAYER_ATTACK);
+  assert.equal(engine.state.phase, PHASES.CARD_SELECT);
   assert.equal(engine.state.lastAttack, null);
   assert.deepEqual(engine.state.lastDefense, { cardName: "brace", shield: 10 });
   assert.ok(engine.state.player.discardPile.some((item) => item.id === "brace"));
   assert.ok(!engine.state.player.hand.some((item) => item.id === "brace"));
 });
 
-test("defense cards are not tactical: they cannot be played without ending the turn", () => {
+test("defense cards are not tactical cards", () => {
   const engine = engineWithHand([defenseCard(), card("a", 4)]);
   assert.equal(engine.playTacticalCard("brace", []), null);
   assert.equal(engine.state.player.shield, 0);
@@ -577,22 +538,79 @@ test("the shield from a defense card absorbs the following CPU attack", () => {
 
   engine.selectCard("brace");
   engine.useSelectedCard();
+  engine.endTurn();
   engine.startCpuTurn();
 
   assert.equal(engine.state.player.hp, hpBefore - 4);
 });
 
-test("with an extra attack left, defending spends it and the turn continues", () => {
-  const engine = engineWithHand([doubleTapCard(), defenseCard(), card("a", 4)]);
-  engine.playTacticalCard("double", []);
+test("cards can be played one after another until the points run out", () => {
+  const engine = engineWithHand([
+    card("a", 4, { cost: 3 }),
+    defenseCard("brace", { cost: 3 }),
+    card("b", 5, { cost: 3 }),
+    card("c", 6, { cost: 3 }),
+  ]);
+  engine.state.player.point = 9;
 
-  engine.selectCard("brace");
-  engine.useSelectedCard();
-  assert.equal(engine.state.phase, PHASES.CARD_SELECT);
-  assert.equal(engine.state.player.extraAttacks, 0);
+  for (const id of ["a", "brace", "b"]) {
+    assert.ok(engine.selectCard(id), id);
+    assert.ok(engine.useSelectedCard(), id);
+    assert.equal(engine.state.phase, PHASES.CARD_SELECT);
+  }
+
+  assert.equal(engine.state.player.point, 0);
+  assert.equal(engine.selectCard("c"), false, "no points left for a fourth card");
+  assert.equal(engine.hasPlayableAttackCard(), false);
+  assert.equal(engine.state.player.cardsPlayed, 3);
+});
+
+test("the role is re-evaluated on the shrinking hand after each card", () => {
+  // 4,4,4 → 1枚使うと 4,4 になり、役が変わる。
+  const engine = engineWithHand([card("a", 4), card("b", 4), card("c", 4)]);
+  engine.selectCard("a");
+  const first = engine.useSelectedCard();
+  engine.selectCard("b");
+  const second = engine.useSelectedCard();
+
+  assert.notEqual(first.roleMultiplier, second.roleMultiplier);
+});
+
+test("the battle ends the moment the CPU dies, mid-turn", () => {
+  const engine = engineWithHand([card("a", 4), card("b", 4)]);
+  engine.state.cpu.hp = 1;
 
   engine.selectCard("a");
   engine.useSelectedCard();
-  assert.equal(engine.state.phase, PHASES.PLAYER_ATTACK);
-  assert.equal(engine.state.lastDefense, null);
+
+  assert.equal(engine.state.phase, PHASES.VICTORY);
+  assert.equal(engine.selectCard("b"), false);
+});
+
+test("turn totals add up every card played and reset next turn", () => {
+  const engine = engineWithHand([
+    card("a", 4, { attack: 10 }),
+    defenseCard(),
+    card("b", 6, { attack: 10 }),
+  ]);
+  engine.state.cpu.actionPattern = [{ type: "ATTACK", value: 1 }];
+
+  engine.selectCard("a");
+  const first = engine.useSelectedCard();
+  engine.selectCard("brace");
+  engine.useSelectedCard();
+  engine.selectCard("b");
+  const second = engine.useSelectedCard();
+
+  assert.deepEqual(engine.state.turnTotals, {
+    cards: 3,
+    dealt: first.dealt + second.dealt,
+    blocked: 0,
+    shield: 10,
+  });
+
+  engine.endTurn();
+  engine.startCpuTurn();
+  engine.finishTurn();
+  assert.deepEqual(engine.state.turnTotals, { cards: 0, dealt: 0, blocked: 0, shield: 0 });
 });

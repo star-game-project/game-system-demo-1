@@ -745,24 +745,7 @@ a:focus-visible {
 
 .role-guide {
   margin-top: auto;
-  padding-top: 20px;
 }
-
-.role-guide__row {
-  display: flex;
-  justify-content: space-between;
-  color: var(--muted);
-  padding: 7px 0;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
-  font-size: 10px;
-}
-
-.role-guide__row b {
-  color: var(--lime);
-  font-size: 11px;
-}
-
-.role-guide__row--risk b { color: var(--danger); }
 
 .hand-section {
   margin-top: 18px;
@@ -1656,4 +1639,23 @@ a:focus-visible {
   color: var(--muted);
   font-size: 10px;
   letter-spacing: 0.08em;
+}
+
+.role-dialog {
+  width: min(560px, calc(100% - 32px));
+  max-height: calc(100% - 32px);
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: var(--text);
+}
+
+.role-dialog::backdrop {
+  background: rgba(5, 7, 12, 0.78);
+}
+
+.role-dialog .role-table {
+  position: static;
+  display: grid;
+  gap: 6px;
 }

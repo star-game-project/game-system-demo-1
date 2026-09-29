@@ -262,12 +262,7 @@ function renderPreview(state) {
         </dl>
         ${selected ? `<div class="selected-abilities">${abilityLabel(selected)}</div>` : `<p class="preview-hint">手札を選ぶと、常在効果と役を含む最終ダメージを確認できます。</p>`}
       </div>
-      <div class="role-guide">
-        <span class="preview-label">ROLE QUICK GUIDE</span>
-        <div class="role-guide__row"><span>同じ目のみ（2枚以上）</span><b>×4</b></div>
-        <div class="role-guide__row"><span>偶数 / 奇数のみ</span><b>×1.5</b></div>
-        <div class="role-guide__row role-guide__row--risk"><span>1・2・3を含む</span><b>×0.5</b></div>
-      </div>
+      <button class="command-button command-button--secondary role-guide" data-action="show-roles">ROLE LIST（役一覧）</button>
     </aside>
   `;
 }
@@ -523,11 +518,37 @@ function renderRoleTable() {
     (role) => `
       <div class="role-table__row ${role.kind === "penalty" ? "role-table__row--risk" : ""}">
         <span>${role.name}</span>
-        <small>${role.description}</small>
+        <small>${role.description} · 系統 ${role.family}</small>
         <b>${multiplierLabel(role.multiplier)}</b>
       </div>
     `,
   ).join("");
+}
+
+const ROLE_RULE_HINT =
+  "手札全体の目で役が決まります。系統ごとに最も倍率の高い役を1つ採り、系統をまたいで倍率を掛け合わせます。";
+
+/**
+ * 戦闘中に役一覧を開くダイアログ。render() は #app を丸ごと書き換えるため、
+ * CPUターンの再描画で閉じないよう #app の外に一度だけ作る。
+ */
+function createRoleDialog() {
+  const dialog = document.createElement("dialog");
+  dialog.className = "role-dialog";
+  dialog.innerHTML = `
+    <form method="dialog" class="role-table">
+      <span class="eyebrow">ROLE LIST</span>
+      <p class="role-table__hint">${ROLE_RULE_HINT}</p>
+      ${renderRoleTable()}
+      <button class="command-button command-button--secondary">CLOSE</button>
+    </form>
+  `;
+  // 枠の外（背景）をクリックしても閉じる。
+  dialog.addEventListener("click", (event) => {
+    if (event.target === dialog) dialog.close();
+  });
+  document.body.append(dialog);
+  return dialog;
 }
 
 function renderDeckBuild() {
@@ -580,7 +601,7 @@ function renderDeckBuild() {
 
         <aside class="role-table">
           <span class="eyebrow">ROLE LIST</span>
-          <p class="role-table__hint">手札全体の目で役が決まります。倍率が最も高い役だけが適用されます。</p>
+          <p class="role-table__hint">${ROLE_RULE_HINT}</p>
           ${renderRoleTable()}
         </aside>
       </div>
@@ -610,6 +631,7 @@ function render() {
         </a>
         <div class="topbar__center"><span>BATTLE</span><strong>#001</strong></div>
         <div class="topbar__actions">
+          <button class="icon-button" data-action="show-roles" aria-label="役一覧" title="役一覧">役</button>
           <button class="icon-button" data-action="edit-deck" aria-label="デッキを編集" title="デッキを編集">☰</button>
           <button class="icon-button" data-action="restart" aria-label="同じデッキで再戦" title="同じデッキで再戦">↻</button>
         </div>
@@ -732,6 +754,7 @@ function bindEvents() {
       event.preventDefault();
       const action = button.dataset.action;
 
+      if (action === "show-roles") roleDialog.showModal();
       if (action === "draw" && engine.chooseDraw(true)) render();
       if (action === "skip" && engine.chooseDraw(false)) render();
       if (action === "cancel-tactical") {
@@ -772,4 +795,5 @@ function bindEvents() {
   });
 }
 
+const roleDialog = createRoleDialog();
 render();

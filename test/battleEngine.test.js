@@ -69,13 +69,13 @@ test("used card is included in role check and then moves to discard", () => {
   engine.selectCard("die_3");
   const result = engine.useSelectedCard();
 
-  // 1,2,3 は3連番かつ減算役。両方が掛かって 1.3 × 0.5 = 0.65。
+  // 1,2,3 は3連番かつ減算役。両方が掛かって 1.15 × 0.5 = 0.575。
   assert.deepEqual(
     result.roles.map((role) => role.id),
     ["three_straight", "one_two_three"],
   );
-  assert.equal(result.roleMultiplier, 0.65);
-  assert.equal(result.finalAttack, Math.round(10 * 0.65));
+  assert.equal(result.roleMultiplier, 0.575);
+  assert.equal(result.finalAttack, Math.round(10 * 0.575));
   assert.equal(engine.state.player.hand.length, 2);
   assert.equal(engine.state.player.discardPile.at(-1).id, "die_3");
   assert.equal(engine.state.cpu.hp, GAME_CONFIG.CPU_MAX_HP - result.finalAttack);
@@ -247,11 +247,11 @@ test("tuning a die into place completes SAME NUMBER before the attack", () => {
   engine.playTacticalCard("t_up", ["five"]);
 
   assert.equal(engine.state.currentRole.roleId, "same_number");
-  assert.equal(engine.state.currentRole.multiplier, 4);
+  assert.equal(engine.state.currentRole.multiplier, 2.5);
 
   // 役倍率は攻撃前に反映される。
   engine.selectCard("six");
-  assert.equal(engine.getAttackPreview("six").finalAttack, 40);
+  assert.equal(engine.getAttackPreview("six").finalAttack, 25);
 });
 
 test("position swap reorders the hand without changing the role", () => {

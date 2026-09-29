@@ -16,7 +16,7 @@ test("SAME NUMBER outranks every other role and needs at least three cards", () 
   assert.equal(evaluateHandRole(hand(2, 2, 2)).roleId, "same_number");
   // すべて同じ目なら偶奇も必ず揃うので、EVEN とは重複させない。
   assert.deepEqual(ids(2, 2, 2), ["same_number"]);
-  assert.equal(mult(2, 2, 2), 4);
+  assert.equal(mult(2, 2, 2), 2.5);
   // 3枚に満たない場合は SAME NUMBER にならない。
   // 2枚のペアは必ず同じ目＝同じ偶奇なので、EVEN / ODD として拾われる。
   assert.equal(evaluateHandRole(hand(5, 5)).roleName, "ODD");
@@ -55,7 +55,7 @@ test("EVEN and ODD recognize hands containing only their parity", () => {
 test("the 1-2-3 penalty multiplies in and is escaped by extending to four", () => {
   // 減算役も他の役と掛け合わさる。1・2・3 は3連番でもあるので両方成立する。
   assert.deepEqual(ids(1, 2, 3, 5, 6), ["three_straight", "one_two_three"]);
-  assert.equal(mult(1, 2, 3, 5, 6), product(1.3, 0.5));
+  assert.equal(mult(1, 2, 3, 5, 6), product(1.15, 0.5));
 
   // ペアがあっても減算は打ち消されない。
   assert.ok(ids(1, 1, 2, 3, 6).includes("one_two_three"));
@@ -68,13 +68,13 @@ test("the 1-2-3 penalty multiplies in and is escaped by extending to four", () =
 test("roles from different families multiply together", () => {
   // 同じ系統は入れ子なので最上位ひとつだけ。系統をまたぐと掛け合わさる。
   assert.deepEqual(ids(3, 3, 3, 1, 1), ["full_house", "odd_only"]);
-  assert.equal(mult(3, 3, 3, 1, 1), product(2.8, 2.8));
+  assert.equal(mult(3, 3, 3, 1, 1), product(1.9, 1.9));
 
   assert.deepEqual(ids(6, 6, 6, 6, 2), ["four_of_a_kind", "even_only"]);
-  assert.equal(mult(6, 6, 6, 6, 2), product(3.5, 2.8));
+  assert.equal(mult(6, 6, 6, 6, 2), product(2.25, 1.9));
 
   assert.deepEqual(ids(2, 3, 4, 4, 5), ["pair", "four_straight"]);
-  assert.equal(mult(2, 3, 4, 4, 5), product(1.2, 1.7));
+  assert.equal(mult(2, 3, 4, 4, 5), product(1.1, 1.35));
 });
 
 test("nested roles within one family are never counted twice", () => {

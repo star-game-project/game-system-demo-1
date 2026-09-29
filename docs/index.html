@@ -277,7 +277,7 @@ Temporary Bonus +5   （前ターンの Boost 2 による）
       <p>次に実行する行動（<b>行動予告</b>）と、パターン全体・現在位置は常に画面に表示される。予告された行動がそのまま実行される。</p>
       <pre><code>intent = cpu.actionPattern[cpu.actionIndex]
 cpu.actionIndex = (cpu.actionIndex + 1) % cpu.actionPattern.length</code></pre>
-      <p>現在のパターンは <code>ATTACK 14</code> の1種類のみで、毎ターン14ダメージの攻撃となる。</p>
+      <p>現在のパターンは <code>ATTACK 10 → ATTACK 10 → ATTACK 22</code> の3ターン周期。1周の合計は42で、毎ターン14ダメージだった旧仕様と平均は同じにしてある。Guard（シールド14）は弱攻撃では4余り、強攻撃では8通すため、使いどころの判断が生まれる。</p>
       <div class="docs-table-wrap"><table>
         <thead><tr><th>行動</th><th>効果</th></tr></thead>
         <tbody><tr><td><code>ATTACK n</code></td><td>シールドで吸収した残りを <code>player.hp</code> から引く</td></tr></tbody>

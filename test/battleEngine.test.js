@@ -410,3 +410,8 @@ test("the CPU performs exactly the announced action, then announces the next one
   assert.equal(state.player.hp, hpBefore - 35);
   assert.deepEqual(getCpuIntent(state.cpu), { type: "ATTACK", value: 5 });
 });
+
+test("one loop of the CPU pattern deals the same total as fourteen per turn", () => {
+  const total = CPU_ACTION_PATTERN.reduce((sum, action) => sum + action.value, 0);
+  assert.equal(total, 14 * CPU_ACTION_PATTERN.length);
+});

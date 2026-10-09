@@ -189,22 +189,19 @@ export const CARD_BY_KEY = Object.freeze(
 );
 
 /** 目の上限を守った初期デッキ（合計20枚）。 */
+/**
+ * 初期デッキ（必要最小限）。目1〜6の攻撃カードを1枚ずつと、防御カード2枚の8枚。
+ * 戦術カードや能力持ちのカードは、戦闘後の入手で増やしていく前提。
+ */
 export const DEFAULT_DECK_COUNTS = Object.freeze({
-  brace_1: 1,
-  pierce_1: 2,
-  parry_2: 1,
-  boost_2: 2,
-  reorder: 1,
-  support_3: 1,
+  pierce_1: 1,
+  boost_2: 1,
   blade_3: 1,
-  tune_down: 1,
-  strike_4: 2,
-  tune_up: 1,
-  heavy_5: 2,
-  recycle: 1,
-  guard: 1,
-  heavy_6: 2,
-  wild_die: 1,
+  strike_4: 1,
+  heavy_5: 1,
+  heavy_6: 1,
+  brace_1: 1,
+  parry_2: 1,
 });
 
 function instantiate(definition, index) {

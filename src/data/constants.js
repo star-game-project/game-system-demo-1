@@ -6,12 +6,15 @@ export const GAME_CONFIG = Object.freeze({
   TURN_POINT_RECOVERY: 5,
   DRAW_COST: 1,
   START_HAND_SIZE: 5,
-  DECK_SIZE: 20,
 });
 
-/** デッキ構築の制約。目を最大4枚に抑えることで、単一の目に寄せたデッキを防ぐ。 */
+/**
+ * 構築画面での初期デッキの制約。目を最大4枚に抑えることで、単一の目に寄せたデッキを防ぐ。
+ * 最小枚数は「5枚の手札 + 1枚のドロー」が引ける枚数。戦闘後の入手・削除はこの制約の対象外。
+ */
 export const DECK_RULES = Object.freeze({
-  DECK_SIZE: 20,
+  MIN_DECK_SIZE: 6,
+  MAX_DECK_SIZE: 20,
   MAX_PER_DIE_VALUE: 4,
   MAX_WILD_CARDS: 2,
   MAX_COPIES_PER_CARD: 4,

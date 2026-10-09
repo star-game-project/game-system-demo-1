@@ -57,7 +57,7 @@ export function canAddCard(counts, key) {
   if (!definition) return false;
 
   const summary = summarizeDeck(counts);
-  if (summary.total >= DECK_RULES.DECK_SIZE) return false;
+  if (summary.total >= DECK_RULES.MAX_DECK_SIZE) return false;
   if ((counts[key] ?? 0) >= DECK_RULES.MAX_COPIES_PER_CARD) return false;
 
   const bucket = dieBucket(definition);
@@ -78,9 +78,9 @@ export function validateDeck(counts) {
   const summary = summarizeDeck(counts);
   const errors = [];
 
-  if (summary.total !== DECK_RULES.DECK_SIZE) {
+  if (summary.total < DECK_RULES.MIN_DECK_SIZE || summary.total > DECK_RULES.MAX_DECK_SIZE) {
     errors.push(
-      `デッキはちょうど${DECK_RULES.DECK_SIZE}枚にしてください（現在 ${summary.total}枚）`,
+      `デッキは${DECK_RULES.MIN_DECK_SIZE}〜${DECK_RULES.MAX_DECK_SIZE}枚にしてください（現在 ${summary.total}枚）`,
     );
   }
   if (!summary.attackCount) {

@@ -624,7 +624,7 @@ function renderDeckBuild() {
           <span class="brand__mark"><i>D<small>6</small></i></span>
           <span><strong>DICE HAND</strong><small>DECK CONSTRUCTION</small></span>
         </a>
-        <div class="topbar__center"><span>DECK</span><strong>${summary.total} / ${DECK_RULES.DECK_SIZE}</strong></div>
+        <div class="topbar__center"><span>DECK</span><strong>${summary.total}枚 (${DECK_RULES.MIN_DECK_SIZE}〜${DECK_RULES.MAX_DECK_SIZE})</strong></div>
         <a class="docs-link" href="/docs">SPEC</a>
         <button class="command-button command-button--primary" data-action="start-battle" ${valid ? "" : "disabled"}>
           <span>BATTLE START</span><small>${valid ? "READY" : "デッキ未完成"}</small>
@@ -635,7 +635,7 @@ function renderDeckBuild() {
         <div class="build-summary__budget">
           <span class="eyebrow">DIE BUDGET</span>
           <div class="die-budget-track">${renderDieBudget(summary)}</div>
-          <small>同じ目は最大${DECK_RULES.MAX_PER_DIE_VALUE}枚、ワイルドは最大${DECK_RULES.MAX_WILD_CARDS}枚。役を作るため必ず5種類以上の目が混ざります。</small>
+          <small>同じ目は最大${DECK_RULES.MAX_PER_DIE_VALUE}枚、ワイルドは最大${DECK_RULES.MAX_WILD_CARDS}枚。デッキは${DECK_RULES.MIN_DECK_SIZE}〜${DECK_RULES.MAX_DECK_SIZE}枚。</small>
         </div>
         <dl class="build-summary__stats">
           <div><dt>ATTACK</dt><dd>${summary.attackCount}</dd></div>
@@ -659,7 +659,7 @@ function renderDeckBuild() {
           <div class="build-heading">
             <div><span class="eyebrow">CARD LIST</span><h2>カード一覧</h2></div>
             <div class="build-actions">
-              <button class="command-button command-button--secondary" data-action="deck-preset">おすすめ構成</button>
+              <button class="command-button command-button--secondary" data-action="deck-preset">初期構成（最小限）</button>
               <button class="command-button command-button--secondary" data-action="deck-clear">すべて外す</button>
             </div>
           </div>

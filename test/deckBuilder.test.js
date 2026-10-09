@@ -46,16 +46,27 @@ test("a single card cannot exceed the copy limit", () => {
   assert.equal(canAddCard(counts, "heavy_6"), false);
 });
 
-test("the die budget forces a deck to spread across at least five values", () => {
-  // 目ごとの上限 4 とワイルド上限 2 では、4種類だけでは 18 枚にしか届かない。
-  const reachableWithFourValues =
-    DECK_RULES.MAX_PER_DIE_VALUE * 4 + DECK_RULES.MAX_WILD_CARDS;
-  assert.ok(reachableWithFourValues < DECK_RULES.DECK_SIZE);
+test("a deck must hold between the minimum and maximum number of cards", () => {
+  const sized = (total) => {
+    const keys = ["heavy_6", "heavy_5", "strike_4", "blade_3", "boost_2", "pierce_1"];
+    let counts = createEmptyCounts();
+    for (let index = 0; counts && summarizeDeck(counts).total < total; index += 1) {
+      counts = addCard(counts, keys[index % keys.length]);
+    }
+    return counts;
+  };
+  assert.equal(validateDeck(sized(DECK_RULES.MIN_DECK_SIZE - 1)).valid, false);
+  assert.equal(validateDeck(sized(DECK_RULES.MIN_DECK_SIZE)).valid, true);
+  assert.equal(validateDeck(sized(DECK_RULES.MAX_DECK_SIZE)).valid, true);
 });
 
-test("adding past the deck size is refused and removing stops at zero", () => {
-  let counts = { ...createEmptyCounts(), ...DEFAULT_DECK_COUNTS };
-  assert.equal(summarizeDeck(counts).total, DECK_RULES.DECK_SIZE);
+test("adding past the maximum deck size is refused and removing stops at zero", () => {
+  const keys = ["heavy_6", "heavy_5", "strike_4", "blade_3", "boost_2", "pierce_1"];
+  let counts = createEmptyCounts();
+  for (let index = 0; summarizeDeck(counts).total < DECK_RULES.MAX_DECK_SIZE; index += 1) {
+    counts = addCard(counts, keys[index % keys.length]);
+  }
+  assert.equal(summarizeDeck(counts).total, DECK_RULES.MAX_DECK_SIZE);
   CARD_CATALOGUE.forEach((definition) => {
     assert.equal(canAddCard(counts, definition.key), false);
   });
@@ -67,7 +78,6 @@ test("adding past the deck size is refused and removing stops at zero", () => {
 test("a deck with no attack cards is rejected", () => {
   let counts = createEmptyCounts();
   const tacticalKeys = ["tune_up", "tune_down", "overclock", "reorder", "recycle"];
-  // 戦術カードだけでは目の枠に阻まれて20枚に届かないため、枚数エラーも併発する。
   tacticalKeys.forEach((key) => {
     for (let index = 0; index < DECK_RULES.MAX_COPIES_PER_CARD; index += 1) {
       counts = addCard(counts, key);

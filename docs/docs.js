@@ -48,11 +48,11 @@ const CONSTANT_LABELS = {
   TURN_POINT_RECOVERY: "ターン終了時の回復量（既定値）",
   DRAW_COST: "ドローの消費ポイント",
   START_HAND_SIZE: "手札の枚数",
-  DECK_SIZE: "デッキ枚数",
 };
 
 const DECK_RULE_LABELS = {
-  DECK_SIZE: "デッキ枚数（ちょうど）",
+  MIN_DECK_SIZE: "デッキ枚数（最小）",
+  MAX_DECK_SIZE: "デッキ枚数（最大）",
   MAX_PER_DIE_VALUE: "同じ目の上限",
   MAX_WILD_CARDS: "ワイルドの上限",
   MAX_COPIES_PER_CARD: "同名カードの上限",

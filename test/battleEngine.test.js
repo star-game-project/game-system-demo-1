@@ -16,13 +16,36 @@ import { createInitialGameState } from "../src/game/gameState.js";
 import { CPU_ACTION_PATTERN } from "../src/data/enemies.js";
 import { cpuActionDamage, getCpuIntent } from "../src/game/enemyLogic.js";
 
-test("the default deck is a legal twenty-card build", () => {
+/**
+ * エンジンのテスト用の20枚デッキ（旧・標準構成）。山札の枚数や一巡を確かめるため、
+ * 初期デッキ（最小構成）ではなくこちらを使う。
+ */
+const TWENTY_CARD_COUNTS = Object.freeze({
+  brace_1: 1, pierce_1: 2, parry_2: 1, boost_2: 2, reorder: 1,
+  support_3: 1, blade_3: 1, tune_down: 1, strike_4: 2, tune_up: 1,
+  heavy_5: 2, recycle: 1, guard: 1, heavy_6: 2, wild_die: 1,
+});
+const TWENTY_CARDS = 20;
+
+function twentyCardState(options) {
+  return createInitialGameState(() => 0.5, createDeckFromCounts(TWENTY_CARD_COUNTS), options);
+}
+
+test("the default deck is a legal minimal build with one attack per die value", () => {
   const deck = createDemoDeck();
-  assert.equal(deck.length, DECK_RULES.DECK_SIZE);
   assert.equal(validateDeck(DEFAULT_DECK_COUNTS).valid, true);
-  assert.ok(deck.some(isTacticalCard));
-  assert.equal(deck.filter(isWildCard).length, 1);
+  assert.equal(deck.length, 8);
+  assert.ok(!deck.some(isTacticalCard));
+  assert.ok(!deck.some(isWildCard));
+  const attackDice = deck.filter((card) => card.attack > 0).map((card) => card.dieValue);
+  assert.deepEqual([...attackDice].sort(), [1, 2, 3, 4, 5, 6]);
+  assert.equal(deck.filter((card) => card.defense > 0).length, 2);
   assert.ok(deck.every((card) => card.baseDieValue === card.dieValue));
+});
+
+test("the twenty-card test deck is itself a legal build", () => {
+  assert.equal(validateDeck(TWENTY_CARD_COUNTS).valid, true);
+  assert.equal(createDeckFromCounts(TWENTY_CARD_COUNTS).length, TWENTY_CARDS);
 });
 
 test("every catalogue card can be built into a deck", () => {
@@ -34,7 +57,7 @@ test("every catalogue card can be built into a deck", () => {
 });
 
 test("battle starts with five free cards, full points and fifteen-card deck", () => {
-  const state = createInitialGameState(() => 0.5);
+  const state = twentyCardState();
   assert.equal(state.phase, PHASES.DRAW_SELECT);
   assert.equal(state.player.hand.length, 5);
   assert.equal(state.player.deck.length, 15);
@@ -42,7 +65,7 @@ test("battle starts with five free cards, full points and fifteen-card deck", ()
 });
 
 test("draw costs one point and moves exactly one card into hand", () => {
-  const engine = new BattleEngine(createInitialGameState(() => 0.5));
+  const engine = new BattleEngine(twentyCardState());
   assert.equal(engine.chooseDraw(true), true);
   assert.equal(engine.state.player.point, 9);
   assert.equal(engine.state.player.hand.length, 6);
@@ -60,7 +83,7 @@ test("used card is included in role check and then moves to discard", () => {
     onUseAbility: null,
     passiveAbility: null,
   }));
-  const state = createInitialGameState(() => 0.5);
+  const state = twentyCardState();
   state.phase = PHASES.CARD_SELECT;
   state.player.hand = cards;
   state.player.deck = [];
@@ -82,7 +105,7 @@ test("used card is included in role check and then moves to discard", () => {
 });
 
 test("CPU attacks, points recover with a max of ten, and turn advances", () => {
-  const state = createInitialGameState(() => 0.5);
+  const state = twentyCardState();
   state.phase = PHASES.PLAYER_ATTACK;
   state.player.point = 8;
   const engine = new BattleEngine(state);
@@ -99,7 +122,7 @@ test("CPU attacks, points recover with a max of ten, and turn advances", () => {
 });
 
 test("ending a turn discards the whole hand and deals a fresh one", () => {
-  const state = createInitialGameState(() => 0.5);
+  const state = twentyCardState();
   state.phase = PHASES.PLAYER_ATTACK;
   const oldHandIds = state.player.hand.map((card) => card.id);
   const engine = new BattleEngine(state);
@@ -116,12 +139,12 @@ test("ending a turn discards the whole hand and deals a fresh one", () => {
   );
   assert.equal(
     player.deck.length + player.hand.length + player.discardPile.length,
-    GAME_CONFIG.DECK_SIZE,
+    TWENTY_CARDS,
   );
 });
 
 test("an empty deck is rebuilt by shuffling the discard pile back in", () => {
-  const state = createInitialGameState(() => 0.5);
+  const state = twentyCardState();
   state.phase = PHASES.PLAYER_ATTACK;
   state.player.discardPile = state.player.deck;
   state.player.deck = [];
@@ -134,13 +157,13 @@ test("an empty deck is rebuilt by shuffling the discard pile back in", () => {
   assert.equal(player.hand.length, GAME_CONFIG.START_HAND_SIZE);
   assert.equal(
     player.deck.length + player.hand.length + player.discardPile.length,
-    GAME_CONFIG.DECK_SIZE,
+    TWENTY_CARDS,
   );
   assert.match(engine.state.battleMessage, /捨て札をシャッフル/);
 });
 
 test("drawing recycles the discard pile once the deck runs dry", () => {
-  const state = createInitialGameState(() => 0.5);
+  const state = twentyCardState();
   state.player.discardPile = state.player.deck;
   state.player.deck = [];
   const engine = new BattleEngine(state, () => 0.5);
@@ -154,7 +177,7 @@ test("drawing recycles the discard pile once the deck runs dry", () => {
 });
 
 test("cards played is tracked separately from the discard pile", () => {
-  const state = createInitialGameState(() => 0.5);
+  const state = twentyCardState();
   state.phase = PHASES.CARD_SELECT;
   const engine = new BattleEngine(state, () => 0.5);
 
@@ -201,7 +224,7 @@ const card = (id, dieValue, overrides = {}) => ({
 });
 
 function engineWithHand(hand) {
-  const state = createInitialGameState(() => 0.5);
+  const state = twentyCardState();
   state.phase = PHASES.CARD_SELECT;
   state.player.hand = hand;
   state.currentRole = evaluateHandRole(hand);
@@ -349,13 +372,13 @@ test("leftover shield does not carry into the next turn", () => {
 });
 
 test("the CPU starts at the head of its action pattern", () => {
-  const state = createInitialGameState(() => 0.5);
+  const state = twentyCardState();
   assert.equal(state.cpu.actionIndex, 0);
   assert.deepEqual(getCpuIntent(state.cpu), CPU_ACTION_PATTERN[0]);
 });
 
 test("the CPU performs exactly the announced action, then announces the next one", () => {
-  const state = createInitialGameState(() => 0.5);
+  const state = twentyCardState();
   state.cpu.actionPattern = [
     { type: "ATTACK", value: 5 },
     { type: "ATTACK", value: 30 },
@@ -377,7 +400,7 @@ test("the CPU performs exactly the announced action, then announces the next one
 });
 
 test("one loop of the CPU pattern deals the same total as fourteen per turn", () => {
-  const state = createInitialGameState(() => 0.5);
+  const state = twentyCardState();
   const engine = new BattleEngine(state);
   state.player.hp = 10_000;
 
@@ -392,7 +415,7 @@ test("one loop of the CPU pattern deals the same total as fourteen per turn", ()
 });
 
 test("CHARGE deals no damage and adds to the next attack, which then resets it", () => {
-  const state = createInitialGameState(() => 0.5);
+  const state = twentyCardState();
   state.cpu.actionPattern = [
     { type: "CHARGE", value: 7 },
     { type: "CHARGE", value: 3 },
@@ -463,7 +486,7 @@ test("CPU block soaks player damage across attacks until it runs out", () => {
 });
 
 test("BLOCK deals no damage, lasts one player turn, and clears when the CPU acts again", () => {
-  const state = createInitialGameState(() => 0.5);
+  const state = twentyCardState();
   state.cpu.actionPattern = [
     { type: "BLOCK", value: 30 },
     { type: "ATTACK", value: 5 },
@@ -628,7 +651,7 @@ test("a new battle in a run carries over the battle count and remaining HP only"
 });
 
 test("a fresh run starts at battle one with full HP", () => {
-  const state = createInitialGameState(() => 0.5);
+  const state = twentyCardState();
   assert.equal(state.battle, 1);
   assert.equal(state.player.hp, GAME_CONFIG.PLAYER_MAX_HP);
 });

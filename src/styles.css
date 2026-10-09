@@ -1710,3 +1710,21 @@ a:focus-visible {
   color: var(--muted);
   font-size: 9px;
 }
+
+.build-shell > .catalogue + .catalogue {
+  margin-top: 24px;
+}
+
+.reward-card--selected {
+  outline: 2px solid var(--cyan);
+  outline-offset: 2px;
+}
+
+.catalogue-card > .command-button {
+  width: 100%;
+  margin-top: 10px;
+}
+
+.topbar__center > span + strong + span {
+  margin-left: 8px;
+}

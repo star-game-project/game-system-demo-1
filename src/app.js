@@ -3,9 +3,11 @@ import {
   GAME_CONFIG,
   PHASES,
   PHASE_LABELS,
+  REWARD_RULES,
   SCREENS,
 } from "./data/constants.js";
 import {
+  CARD_BY_KEY,
   CARD_CATALOGUE,
   DEFAULT_DECK_COUNTS,
   createDeckFromCounts,
@@ -38,6 +40,12 @@ import {
   normalizePointRules,
   pointRulesLabel,
 } from "./game/pointRules.js";
+import {
+  applyReward,
+  canRemoveFromRun,
+  countCards,
+  drawRewardOffers,
+} from "./game/rewardLogic.js";
 
 const app = document.querySelector("#app");
 const timers = new Set();
@@ -50,15 +58,38 @@ let engine = null;
 let pointRules = { ...DEFAULT_POINT_RULES };
 // 戦術カードの対象選択中だけ保持する UI 状態。
 let pendingTactical = null;
+// 連戦中のデッキ（カードごとの枚数）。構築画面のデッキから始まり、報酬で入手・削除して育つ。
+let runCounts = null;
+// 報酬画面の状態：{ offers, gainKey, removeKey, battle, playerHp }
+let reward = null;
+
+/** 構築画面のデッキで、1戦目から連戦を始める。 */
+function startRun() {
+  runCounts = { ...deckCounts };
+  startBattle();
+}
 
 /** carry を渡すと連戦として、何戦目かと残りHPを引き継ぐ。 */
 function startBattle(carry = {}) {
   clearTimers();
   pendingTactical = null;
+  reward = null;
   engine = new BattleEngine(
-    createInitialGameState(Math.random, createDeckFromCounts(deckCounts), { pointRules, ...carry }),
+    createInitialGameState(Math.random, createDeckFromCounts(runCounts), { pointRules, ...carry }),
   );
   screen = SCREENS.BATTLE;
+}
+
+function openReward() {
+  const { state } = engine;
+  reward = {
+    offers: drawRewardOffers(),
+    gainKey: null,
+    removeKey: null,
+    battle: state.battle,
+    playerHp: state.player.hp,
+  };
+  screen = SCREENS.REWARD;
 }
 
 function cancelTargeting() {
@@ -488,7 +519,7 @@ function renderResult(state) {
           <button class="command-button command-button--secondary" data-action="edit-deck">EDIT DECK</button>
           ${
             victory
-              ? `<button class="command-button command-button--primary" data-action="next-battle">NEXT BATTLE</button>`
+              ? `<button class="command-button command-button--primary" data-action="open-reward">REWARD</button>`
               : `<button class="command-button command-button--primary" data-action="restart">RETRY FROM #001</button>`
           }
         </div>
@@ -615,6 +646,90 @@ function renderPointRules() {
   `;
 }
 
+function cardStatLabel(definition) {
+  if (definition.tacticalAbility) return "TACTICAL";
+  if (isDefenseCard(definition)) return `DEF ${definition.defense}`;
+  return `ATK ${definition.attack}`;
+}
+
+/** 報酬・デッキ一覧で使う、操作ボタンを1つ持つカード。 */
+function rewardCard(definition, { count = null, selected = false, disabled = false, data, buttonLabel }) {
+  const bucket = dieBucket(definition);
+  return `
+    <article class="catalogue-card ${bucket === "wild" ? "catalogue-card--wild" : `die-${definition.dieValue}`} ${definition.tacticalAbility ? "catalogue-card--tactical" : ""} ${selected ? "is-included reward-card--selected" : ""}">
+      <header>
+        <span class="catalogue-card__die">${dieGlyph(definition)}</span>
+        <div>
+          <strong>${definition.name}${count === null ? "" : ` ×${count}`}</strong>
+          <small>${cardStatLabel(definition)} / COST ${definition.cost}</small>
+        </div>
+      </header>
+      ${abilityLabel(definition)}
+      <button type="button" class="command-button command-button--secondary" ${data} ${disabled ? "disabled" : ""}>${buttonLabel}</button>
+    </article>
+  `;
+}
+
+function renderReward() {
+  const { offers, gainKey, removeKey, battle, playerHp } = reward;
+  const deckEntries = CARD_CATALOGUE.filter((definition) => (runCounts[definition.key] ?? 0) > 0);
+  const result = applyReward(runCounts, offers, reward);
+
+  const offerCards = offers.map((key) =>
+    rewardCard(CARD_BY_KEY[key], {
+      selected: gainKey === key,
+      data: `data-reward-gain="${key}"`,
+      buttonLabel: gainKey === key ? "選択中（もう一度で解除）" : "これを入手",
+    }),
+  ).join("");
+
+  const deckCards = deckEntries.map((definition) => {
+    const key = definition.key;
+    const selected = removeKey === key;
+    const removable = selected || canRemoveFromRun(runCounts, key, gainKey);
+    return rewardCard(definition, {
+      count: runCounts[key],
+      selected,
+      disabled: !removable,
+      data: `data-reward-remove="${key}"`,
+      buttonLabel: selected ? "削除する（もう一度で解除）" : removable ? "1枚削除" : `${DECK_RULES.MIN_DECK_SIZE}枚未満になるため不可`,
+    });
+  }).join("");
+
+  const gainText = gainKey ? `${CARD_BY_KEY[gainKey].name} を入手` : "入手しない";
+  const removeText = removeKey ? `${CARD_BY_KEY[removeKey].name} を1枚削除` : "削除しない";
+
+  return `
+    <main class="build-shell">
+      <header class="topbar">
+        <a class="brand" href="#" aria-label="DICE HAND 報酬">
+          <span class="brand__mark"><i>D<small>6</small></i></span>
+          <span><strong>DICE HAND</strong><small>BATTLE REWARD</small></span>
+        </a>
+        <div class="topbar__center"><span>CLEARED</span><strong>#${String(battle).padStart(3, "0")}</strong></div>
+        <button class="command-button command-button--primary" data-action="next-battle">
+          <span>NEXT BATTLE</span><small>${gainText} / ${removeText}</small>
+        </button>
+      </header>
+
+      <section class="point-rules">
+        <div><span class="eyebrow">RUN STATUS</span><strong>HP ${playerHp} / ${GAME_CONFIG.PLAYER_MAX_HP}（回復なし） · デッキ ${countCards(runCounts)}枚 → ${countCards(result)}枚</strong></div>
+        <small>候補${REWARD_RULES.OFFER_COUNT}枚から${REWARD_RULES.MAX_GAINS}枚まで入手し、デッキから${REWARD_RULES.MAX_REMOVALS}枚まで削除できます（どちらも任意）。削除は${DECK_RULES.MIN_DECK_SIZE}枚を下回らない範囲で行えます。</small>
+      </section>
+
+      <section class="catalogue">
+        <div class="build-heading"><div><span class="eyebrow">GAIN</span><h2>入手するカード（1枚まで）</h2></div></div>
+        <div class="catalogue-grid">${offerCards}</div>
+      </section>
+
+      <section class="catalogue">
+        <div class="build-heading"><div><span class="eyebrow">REMOVE</span><h2>今のデッキ（1枚まで削除）</h2></div></div>
+        <div class="catalogue-grid">${deckCards}</div>
+      </section>
+    </main>
+  `;
+}
+
 function renderDeckBuild() {
   const { valid, errors, summary } = validateDeck(deckCounts);
   return `
@@ -683,6 +798,12 @@ function render() {
     return;
   }
 
+  if (screen === SCREENS.REWARD) {
+    app.innerHTML = renderReward();
+    bindEvents();
+    return;
+  }
+
   const state = engine.state;
   const targetingValid =
     pendingTactical &&
@@ -696,7 +817,7 @@ function render() {
           <span class="brand__mark"><i>D<small>6</small></i></span>
           <span><strong>DICE HAND</strong><small>TACTICAL CARD BATTLE</small></span>
         </a>
-        <div class="topbar__center"><span>BATTLE</span><strong>#${String(state.battle).padStart(3, "0")}</strong></div>
+        <div class="topbar__center"><span>BATTLE</span><strong>#${String(state.battle).padStart(3, "0")}</strong><span>DECK ${countCards(runCounts)}</span></div>
         <div class="topbar__actions">
           <button class="icon-button" data-action="show-roles" aria-label="役一覧" title="役一覧">役</button>
           <button class="icon-button" data-action="edit-deck" aria-label="デッキを編集" title="デッキを編集">☰</button>
@@ -827,6 +948,26 @@ function bindEvents() {
     });
   });
 
+  app.querySelectorAll("[data-reward-gain]").forEach((button) => {
+    button.addEventListener("click", () => {
+      const key = button.dataset.rewardGain;
+      reward.gainKey = reward.gainKey === key ? null : key;
+      // 入手を外して最小枚数を割る場合は、削除の選択も外す。
+      if (reward.removeKey && !canRemoveFromRun(runCounts, reward.removeKey, reward.gainKey)) {
+        reward.removeKey = null;
+      }
+      render();
+    });
+  });
+
+  app.querySelectorAll("[data-reward-remove]").forEach((button) => {
+    button.addEventListener("click", () => {
+      const key = button.dataset.rewardRemove;
+      reward.removeKey = reward.removeKey === key ? null : key;
+      render();
+    });
+  });
+
   app.querySelectorAll("[data-card-id]").forEach((button) => {
     button.addEventListener("click", () => {
       handleCardClick(button.dataset.cardId);
@@ -855,7 +996,7 @@ function bindEvents() {
         proceedAfterPlayerAction();
       }
       if (action === "start-battle" && validateDeck(deckCounts).valid) {
-        startBattle();
+        startRun();
         render();
       }
       if (action === "deck-preset") {
@@ -872,12 +1013,17 @@ function bindEvents() {
         screen = SCREENS.DECK_BUILD;
         render();
       }
-      if (action === "next-battle" && engine.state.phase === PHASES.VICTORY) {
-        startBattle({ battle: engine.state.battle + 1, playerHp: engine.state.player.hp });
+      if (action === "open-reward" && engine.state.phase === PHASES.VICTORY) {
+        openReward();
+        render();
+      }
+      if (action === "next-battle" && reward) {
+        runCounts = applyReward(runCounts, reward.offers, reward);
+        startBattle({ battle: reward.battle + 1, playerHp: reward.playerHp });
         render();
       }
       if (action === "restart") {
-        startBattle();
+        startRun();
         render();
       }
     });

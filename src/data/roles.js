@@ -12,6 +12,10 @@
  *
  * ボーナス役の倍率は、旧値のボーナス部分（1を超える分）を半分にしたもの（例：×2.8 → ×1.9）。
  * 減算役（×0.5）は変えていない。
+ *
+ * EVEN / ODD はさらに ×1.9 → ×1.3 に下げている。デッキを偶奇に寄せるだけで成立率を100%にできる唯一の役で、
+ * 同じ寄せ方で同じ目の系統も成立しやすくなり掛け合わさるため、偶数のみのデッキが突出していた
+ * （12枚・各目4枚以下での手札5枚の期待倍率：偶数のみ ×2.77 → ×1.90、均等 ×1.23 → ×1.21）。
  */
 export const HAND_ROLES = Object.freeze([
   {
@@ -75,7 +79,7 @@ export const HAND_ROLES = Object.freeze([
     id: "even_only",
     name: "EVEN",
     family: "parity",
-    multiplier: 1.9,
+    multiplier: 1.3,
     kind: "bonus",
     priority: 88,
     minHandSize: 2,
@@ -85,7 +89,7 @@ export const HAND_ROLES = Object.freeze([
     id: "odd_only",
     name: "ODD",
     family: "parity",
-    multiplier: 1.9,
+    multiplier: 1.3,
     kind: "bonus",
     priority: 88,
     minHandSize: 2,

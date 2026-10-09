@@ -68,10 +68,10 @@ test("the 1-2-3 penalty multiplies in and is escaped by extending to four", () =
 test("roles from different families multiply together", () => {
   // 同じ系統は入れ子なので最上位ひとつだけ。系統をまたぐと掛け合わさる。
   assert.deepEqual(ids(3, 3, 3, 1, 1), ["full_house", "odd_only"]);
-  assert.equal(mult(3, 3, 3, 1, 1), product(1.9, 1.9));
+  assert.equal(mult(3, 3, 3, 1, 1), product(1.9, 1.3));
 
   assert.deepEqual(ids(6, 6, 6, 6, 2), ["four_of_a_kind", "even_only"]);
-  assert.equal(mult(6, 6, 6, 6, 2), product(2.25, 1.9));
+  assert.equal(mult(6, 6, 6, 6, 2), product(2.25, 1.3));
 
   assert.deepEqual(ids(2, 3, 4, 4, 5), ["pair", "four_straight"]);
   assert.equal(mult(2, 3, 4, 4, 5), product(1.1, 1.35));
@@ -94,7 +94,10 @@ test("a wild die takes whichever value scores highest", () => {
   assert.equal(evaluateHandRole(withWild(4, 4)).roleName, "SAME NUMBER");
   assert.equal(evaluateHandRole(withWild(2, 3, 4, 5)).roleName, "FIVE STRAIGHT");
   assert.equal(evaluateHandRole(withWild(4, 4, 6, 6)).roleName, "FULL HOUSE");
-  assert.equal(evaluateHandRole(withWild(1, 5, 5)).roleName, "ODD");
+  // 1,5,5 + ワイルド：5 にすると THREE OF A KIND × ODD が両方成立し、最も高くなる。
+  const oddTrio = evaluateHandRole(withWild(1, 5, 5));
+  assert.deepEqual(oddTrio.roles.map((role) => role.id).sort(), ["odd_only", "three_of_a_kind"]);
+  assert.equal(oddTrio.multiplier, product(1.5, 1.3));
 });
 
 test("a wild die is never used to complete the 1-2-3 penalty", () => {

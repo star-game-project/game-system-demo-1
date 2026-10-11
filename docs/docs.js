@@ -17,6 +17,7 @@ import { BONUS_ROLES, PENALTY_ROLES, ROLE_FAMILIES } from "/src/data/roles.js";
 import { summarizeDeck, bucketLimit } from "/src/game/deckBuilder.js";
 import {
   TACTICAL_ABILITIES,
+  isAreaAttackCard,
   isDefenseCard,
   isTacticalCard,
   isWildCard,
@@ -93,6 +94,9 @@ function abilityText(definition) {
   if (definition.passiveAbility?.type === "WILD_DIE") {
     parts.push("常在：役判定で任意の目として扱う");
   }
+  if (isAreaAttackCard(definition)) {
+    parts.push("全体攻撃：生き残っているすべての敵に当たる（ブロックは敵ごと）");
+  }
   if (definition.tacticalAbility) {
     parts.push(`戦術：${tacticalText(definition.tacticalAbility)}`);
   }
@@ -165,7 +169,11 @@ table(
   ["カード", "種別", "目", "Cost", "ATK / DEF", "能力"],
   CARD_CATALOGUE.map((definition) => [
     `<b>${definition.name}</b>`,
-    isTacticalCard(definition) ? "戦術" : isDefenseCard(definition) ? "防御" : "攻撃",
+    isTacticalCard(definition)
+      ? "戦術"
+      : isDefenseCard(definition)
+        ? "防御"
+        : isAreaAttackCard(definition) ? "攻撃（全体）" : "攻撃",
     dieLabel(definition),
     `${definition.cost}`,
     isTacticalCard(definition)

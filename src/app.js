@@ -25,6 +25,7 @@ import {
 } from "./game/deckBuilder.js";
 import {
   getTemporaryBonus,
+  isAreaAttackCard,
   isDefenseCard,
   isTacticalCard,
   isWildCard,
@@ -159,6 +160,9 @@ function abilityLabel(card) {
   }
   if (isWildCard(card)) {
     return `<span class="ability ability--wild"><i>◈</i> WILD DIE</span>`;
+  }
+  if (isAreaAttackCard(card)) {
+    return `<span class="ability ability--boost"><i>◎</i> ALL ENEMIES（各敵に ATK × 役倍率）</span>`;
   }
   if (card.onUseAbility?.type === "NEXT_TURN_ATTACK_BONUS") {
     return `<span class="ability ability--boost"><i>↗</i> NEXT TURN ATK +${card.onUseAbility.value}</span>`;
@@ -343,7 +347,11 @@ function renderPreview(state) {
             : `<div class="final-damage"><span>FINAL DAMAGE</span><strong>${preview?.finalAttack ?? "—"}</strong></div>`
         }
         <dl class="damage-formula">
-          <div><dt>TARGET</dt><dd>${engine.getTargetEnemy()?.name ?? "—"}</dd></div>
+          <div><dt>TARGET</dt><dd>${
+            isAreaAttackCard(selected)
+              ? `ALL（${(preview?.hits ?? []).map((hit) => `${hit.enemyName} ${hit.dealt}`).join(" / ")}）`
+              : engine.getTargetEnemy()?.name ?? "—"
+          }</dd></div>
           <div><dt>ENEMY BLOCK</dt><dd>${preview ? `−${preview.blocked}` : `${engine.getTargetEnemy()?.block ?? 0}`}</dd></div>
           <div><dt>DEALT</dt><dd>${preview?.dealt ?? "—"}</dd></div>
         </dl>

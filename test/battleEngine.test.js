@@ -775,3 +775,72 @@ test("defeated enemies do not act, and the shield is shared across enemy attacks
   assert.equal(state.lastCpuActions.length, 1);
   assert.equal(state.player.hp, hpBefore - 15);
 });
+
+const sweepCard = (id = "sweep", overrides = {}) =>
+  card(id, 3, { attack: 9, cost: 2, target: "all", ...overrides });
+
+function twoEnemyEngine(hand) {
+  const engine = engineWithHand(hand);
+  engine.state.enemies = createInitialGameState(() => 0.5).enemies;
+  return engine;
+}
+
+test("an area attack hits every living enemy with the same role-multiplied damage", () => {
+  // 3,3,2 は PAIR（×1.1）だけが成立する。9 × 1.1 = 10 を両方の敵に。
+  const engine = twoEnemyEngine([sweepCard(), card("b", 3), card("c", 2)]);
+  const [first, second] = engine.state.enemies;
+
+  engine.selectCard("sweep");
+  const preview = engine.getAttackPreview();
+  assert.deepEqual(preview.hits.map((hit) => hit.dealt), [10, 10]);
+  assert.equal(first.hp, ENEMY_MAX_HP, "a preview changes nothing");
+
+  const result = engine.useSelectedCard();
+  assert.equal(result.targetId, "all");
+  assert.equal(result.dealt, 20);
+  assert.equal(first.hp, ENEMY_MAX_HP - 10);
+  assert.equal(second.hp, ENEMY_MAX_HP - 10);
+  assert.match(engine.state.battleMessage, /全体/);
+});
+
+test("an area attack meets each enemy's own block", () => {
+  const engine = twoEnemyEngine([sweepCard(), card("b", 4), card("c", 1)]);
+  const [first, second] = engine.state.enemies;
+  first.block = 5;
+
+  engine.selectCard("sweep");
+  const result = engine.useSelectedCard();
+  assert.deepEqual(result.hits.map((hit) => [hit.blocked, hit.dealt]), [[5, 4], [0, 9]]);
+  assert.equal(first.block, 0);
+  assert.equal(second.hp, ENEMY_MAX_HP - 9);
+});
+
+test("an area attack skips defeated enemies and can win the battle", () => {
+  const engine = twoEnemyEngine([sweepCard(), card("b", 4), card("c", 1)]);
+  const [first, second] = engine.state.enemies;
+  first.hp = 0;
+  second.hp = 5;
+
+  engine.selectCard("sweep");
+  const result = engine.useSelectedCard();
+  assert.deepEqual(result.hits.map((hit) => hit.enemyId), [second.id]);
+  assert.equal(engine.state.phase, PHASES.VICTORY);
+});
+
+test("when an area attack fells the chosen target, the target moves on", () => {
+  const engine = twoEnemyEngine([sweepCard(), card("b", 4), card("c", 1)]);
+  const [first, second] = engine.state.enemies;
+  first.hp = 3;
+
+  engine.selectCard("sweep");
+  engine.useSelectedCard();
+  assert.equal(first.hp, 0);
+  assert.equal(engine.state.targetId, second.id);
+  assert.equal(engine.state.phase, PHASES.CARD_SELECT);
+});
+
+test("the catalogue offers Sweep 3 as an area attack outside the starter deck", () => {
+  const sweep = CARD_CATALOGUE.find((definition) => definition.key === "sweep_3");
+  assert.equal(sweep.target, "all");
+  assert.equal(DEFAULT_DECK_COUNTS.sweep_3, undefined);
+});

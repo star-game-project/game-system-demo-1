@@ -298,6 +298,12 @@ enemy.actionIndex = (enemy.actionIndex + 1) % enemy.actionPattern.length</code><
       <h3>10.1 攻撃の対象</h3>
       <p>攻撃カードは<b>対象の敵1体</b>（個人攻撃）に当たる。対象は敵の欄をクリックして選び、選んだ敵には <code>◎ TARGET</code> と枠を表示する。初期値は先頭の敵。選んだ対象はターンをまたいで保たれる。倒れた敵は選べず、対象が倒れると生き残っている先頭の敵に移る。攻撃プレビューは対象とそのブロックを表示する。</p>
 
+      <p><b>全体攻撃</b>のカード（<code>target: "all"</code>。現在は Sweep 3）は、<b>生き残っているすべての敵</b>に当たる。役の倍率と能力のボーナスは通常の攻撃と同じく掛かり、同じ値（finalAttack）を各敵に与える。ブロックは敵ごとに受ける。プレビューには敵ごとの与ダメージを表示する。</p>
+      <pre><code>for (enemy of aliveEnemies) {
+  blocked = Math.min(enemy.block, finalAttack)
+  enemy.hp -= finalAttack - blocked
+}</code></pre>
+
       <h3>10.2 ブロック</h3>
       <p><b>ブロック</b>は敵ごとに持ち、<b>その敵への攻撃だけ</b>を防ぐ。その敵が行動するたびに（行動の解決前に）0へ戻す。つまり BLOCK の効果は直後のプレイヤーターン1回限り。そのターン中は複数枚の攻撃で共有して削られる。攻撃プレビューもブロック分を含めて表示する（プレビューではブロックを消費しない）。</p>
       <pre><code>blocked = Math.min(target.block, finalAttack)

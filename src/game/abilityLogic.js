@@ -20,6 +20,11 @@ export function isDefenseCard(card) {
   return (card?.defense ?? 0) > 0;
 }
 
+/** 生き残っているすべての敵に当たる全体攻撃のカードか。 */
+export function isAreaAttackCard(card) {
+  return card?.target === "all";
+}
+
 /** 役判定で任意の目として扱われるカードか。 */
 export function isWildCard(card) {
   return card?.passiveAbility?.type === "WILD_DIE";

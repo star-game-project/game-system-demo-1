@@ -7,6 +7,7 @@ import { createTurnTotals } from "./gameState.js";
 import { recoverPoints } from "./pointRules.js";
 import {
   createTemporaryEffects,
+  isAreaAttackCard,
   isDefenseCard,
   isTacticalCard,
   pruneTemporaryEffects,
@@ -103,7 +104,31 @@ export class BattleEngine {
       this.state.turn,
       this.state.roleLevels,
     );
-    return { ...attack, ...this.applyCpuBlock(attack.finalAttack, false) };
+    return { ...attack, ...this.resolveHits(card, attack.finalAttack, false) };
+  }
+
+  /** 攻撃が当たる敵：全体攻撃なら生き残っているすべての敵、それ以外は対象の1体。 */
+  getAttackTargets(card) {
+    if (isAreaAttackCard(card)) return aliveEnemies(this.state.enemies);
+    const target = this.getTargetEnemy();
+    return target ? [target] : [];
+  }
+
+  /**
+   * 攻撃を当たる敵それぞれに解決する。ブロックは敵ごとに受ける。
+   * commit が false のときは計算だけ行い、ブロックもHPも変えない（プレビュー用）。
+   */
+  resolveHits(card, damage, commit = true) {
+    const hits = this.getAttackTargets(card).map((enemy) => {
+      const { blocked, dealt } = this.applyCpuBlock(damage, commit, enemy);
+      if (commit) enemy.hp = Math.max(0, enemy.hp - dealt);
+      return { enemyId: enemy.id, enemyName: enemy.name, blocked, dealt, defeated: enemy.hp <= 0 };
+    });
+    return {
+      hits,
+      blocked: hits.reduce((sum, hit) => sum + hit.blocked, 0),
+      dealt: hits.reduce((sum, hit) => sum + hit.dealt, 0),
+    };
   }
 
   /** 攻撃の対象。選んだ敵が倒れていれば、生き残っている先頭の敵。 */
@@ -232,38 +257,37 @@ export class BattleEngine {
       this.state.roleLevels,
     );
 
-    const target = this.getTargetEnemy();
-    const { blocked, dealt } = this.applyCpuBlock(attack.finalAttack, true, target);
+    const { hits, blocked, dealt } = this.resolveHits(card, attack.finalAttack);
+    attack.hits = hits;
     attack.blocked = blocked;
     attack.dealt = dealt;
-    attack.targetId = target.id;
-    const damageText = blocked
-      ? `${dealt}ダメージ（ブロック −${blocked}）`
-      : `${dealt}ダメージ`;
+    attack.targetId = isAreaAttackCard(card) ? "all" : hits[0].enemyId;
+    const hitText = (hit) =>
+      `${hit.enemyName} ${hit.dealt}ダメージ${hit.blocked ? `（ブロック −${hit.blocked}）` : ""}${hit.defeated ? " 撃破！" : ""}`;
 
     this.state.player.point = Math.max(0, this.state.player.point - card.cost);
     this.state.player.temporaryEffects.push(
       ...createTemporaryEffects(card, this.state.turn),
     );
-    target.hp = Math.max(0, target.hp - dealt);
     this.state.player.hand = this.state.player.hand.filter((item) => item.id !== card.id);
     this.state.player.discardPile.push(card);
     this.state.player.cardsPlayed += 1;
     this.state.currentRole = evaluateHandRole(this.state.player.hand, this.state.roleLevels);
-    this.state.lastAttack = { ...attack, cardName: card.name, targetName: target.name };
+    this.state.lastAttack = { ...attack, cardName: card.name };
     this.state.lastDefense = null;
     this.state.turnTotals.cards += 1;
     this.state.turnTotals.dealt += dealt;
     this.state.turnTotals.blocked += blocked;
     this.state.selectedCardId = null;
 
-    const defeatedText = target.hp <= 0 ? ` ${target.name} を撃破！` : "";
-    this.state.battleMessage = `${card.name} → ${target.name} — ${damageText}！${defeatedText}`;
+    const scope = isAreaAttackCard(card) ? "全体" : hits[0].enemyName;
+    this.state.battleMessage = `${card.name} → ${scope} — ${hits.map(hitText).join(" / ")}`;
     // ターンは終了しない。ポイントが続く限り続けてカードを使える。
     const alive = aliveEnemies(this.state.enemies);
     if (!alive.length) {
       this.state.phase = PHASES.VICTORY;
-    } else if (target.hp <= 0) {
+    } else if (!alive.some((enemy) => enemy.id === this.state.targetId)) {
+      // 対象が倒れたら、生き残っている先頭の敵に移る。
       this.state.targetId = alive[0].id;
     }
     return attack;

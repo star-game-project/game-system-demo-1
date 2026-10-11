@@ -96,6 +96,20 @@ const CARD_CATALOGUE = Object.freeze([
     tacticalAbility: null,
   },
 
+  {
+    // 全体攻撃：生き残っているすべての敵に当たる。役の倍率・ボーナスは通常どおり掛かり、
+    // ブロックは敵ごとに受ける。2体に当たれば合計18（同コストの Strike 4 は単体15）。
+    key: "sweep_3",
+    name: "Sweep 3",
+    cost: 2,
+    attack: 9,
+    dieValue: 3,
+    target: "all",
+    onUseAbility: null,
+    passiveAbility: null,
+    tacticalAbility: null,
+  },
+
   // ---- 防御カード（攻撃の代わりに使う通常行動。使うとターンが終了する。防御値に役の倍率は掛からない）----
   // 攻撃カードとしては使い道のなかった低攻撃力のカード（旧 Strike 1 / Jab 2）を置き換えたもの。
   {

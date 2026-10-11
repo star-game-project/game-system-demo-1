@@ -28,7 +28,7 @@
 
     <section id="overview">
       <h2>1. 概要</h2>
-      <p>プレイヤーとCPUが1対1で戦うターン制カードバトル。プレイヤーはデッキからカードを引き、ポイントを消費してカードを使用し、CPUのHPを0にすれば勝利する。</p>
+      <p>プレイヤーが複数の敵（CPU）と戦うターン制カードバトル。プレイヤーはデッキからカードを引き、ポイントを消費してカードを使用し、すべての敵のHPを0にすれば勝利する。</p>
       <p>本デモは戦闘のコアルールが成立するかを確認することを目的とし、以下2つの画面で構成される。</p>
       <ul>
         <li><b>DECK CONSTRUCTION</b> — カード一覧から初期デッキ（6〜20枚）を構築する</li>
@@ -102,7 +102,7 @@
 
       <h3>5.1 戦闘開始</h3>
       <ol>
-        <li>プレイヤーHP・CPU HPを最大値にする</li>
+        <li>プレイヤーHP・敵のHPを最大値にする（連戦ではプレイヤーHPは引き継ぐ）</li>
         <li>ポイントを初期値にする</li>
         <li>構築したデッキを生成しシャッフルする</li>
         <li>デッキから5枚引く（ポイントを消費しない）</li>
@@ -114,7 +114,7 @@
 2. カード使用      攻撃・防御・戦術カードを、ポイントが続く限り何枚でも使う
                    （どのカードもターンを終了しない。1枚使うごとに残りの手札で役を判定し直す）
 3. END TURN        プレイヤーが自分でターンを終了する（いつでも押せる）
-4. CPUの行動       シールドがあれば先に吸収する
+4. 敵の行動        生き残っている敵が先頭から順に行動。シールドは順に削られる
 5. ポイント回復
 6. シールドをリセット
 7. 手札を全て捨て、5枚引き直す
@@ -163,7 +163,7 @@
 absorbed = Math.min(shield, incoming)
 taken    = incoming - absorbed
 hp      -= taken</code></pre>
-      <p>1ターンに複数枚使う場合、2枚目以降は<b>1枚減った手札で役を判定し直す</b>ため、使うほど役が崩れる可能性がある。CPUのHPが0になった時点で、ターンの途中でも即座に勝利となる。</p>
+      <p>1ターンに複数枚使う場合、2枚目以降は<b>1枚減った手札で役を判定し直す</b>ため、使うほど役が崩れる可能性がある。すべての敵のHPが0になった時点で、ターンの途中でも即座に勝利となる。</p>
 
       <h3>6.5 手札の総入れ替え</h3>
       <p>ターン終了時に<b>手札をすべて捨て札へ送り、あらためて5枚引き直す</b>。引き直しはポイントを消費しない。</p>
@@ -287,24 +287,33 @@ Temporary Bonus +5   （前ターンの Boost 2 による）
     </section>
 
     <section id="cpu">
-      <h2>10. CPU</h2>
-      <p>本デモのCPUはカードを使用せず、<b>行動パターン</b>（<code>src/data/enemies.js</code> の <code>CPU_ACTION_PATTERN</code>）を先頭から1ターンに1つずつ実行する。末尾の次は先頭に戻る。ランダム性はない。</p>
-      <p>次に実行する行動（<b>行動予告</b>）と、パターン全体・現在位置は常に画面に表示される。予告された行動がそのまま実行される。</p>
-      <pre><code>intent = cpu.actionPattern[cpu.actionIndex]
-cpu.actionIndex = (cpu.actionIndex + 1) % cpu.actionPattern.length</code></pre>
-      <p>現在のパターンは <code>ATTACK 14 → CHARGE +14 → ATTACK 28 → BLOCK 30</code> の4ターン周期。3ターン目の攻撃は溜め込み分が乗って <b>42</b> になる。1周の与ダメージ合計は56で、毎ターン14ダメージだった旧仕様と平均は同じにしてある。</p>
-      <p><b>ブロック</b>は、CPUが行動するたびに（行動の解決前に）0へ戻す。つまり BLOCK の効果は直後のプレイヤーターン1回限り。そのターン中は複数枚の攻撃で共有して削られる。プレイヤーの攻撃は次のように解決する。攻撃プレビューもブロック分を含めて表示する（プレビューではブロックを消費しない）。</p>
-      <pre><code>blocked = Math.min(cpu.block, finalAttack)
+      <h2>10. 敵（CPU）</h2>
+      <p>1回の戦闘には<b>同じ種類の敵が2体</b>出る（<code>src/data/enemies.js</code> の <code>ENCOUNTER</code>）。2体の合計が旧仕様の1体（HP100・1ターン平均14ダメージ）と同じになるよう、1体あたり <b>HP50</b>、行動パターンの数値は半分にしてある。2体の行動周期はそろっており、同じターンに同じ行動をする。</p>
+      <p>敵はカードを使用せず、<b>行動パターン</b>（<code>CPU_ACTION_PATTERN</code>）を先頭から1ターンに1つずつ実行する。末尾の次は先頭に戻る。ランダム性はない。</p>
+      <p>各敵の次の行動（<b>行動予告</b>）、パターン全体・現在位置、溜め込み・ブロックの残量は常に画面に表示される。予告された行動がそのまま実行される。</p>
+      <pre><code>intent = enemy.actionPattern[enemy.actionIndex]
+enemy.actionIndex = (enemy.actionIndex + 1) % enemy.actionPattern.length</code></pre>
+      <p>現在のパターンは <code>ATTACK 7 → CHARGE +7 → ATTACK 14 → BLOCK 15</code> の4ターン周期。3ターン目の攻撃は溜め込み分が乗って <b>21</b> になる（2体で42）。1体の1周の与ダメージ合計は28で、2体合わせて1ターン平均14。</p>
+
+      <h3>10.1 攻撃の対象</h3>
+      <p>攻撃カードは<b>対象の敵1体</b>（個人攻撃）に当たる。対象は敵の欄をクリックして選び、選んだ敵には <code>◎ TARGET</code> と枠を表示する。初期値は先頭の敵。選んだ対象はターンをまたいで保たれる。倒れた敵は選べず、対象が倒れると生き残っている先頭の敵に移る。攻撃プレビューは対象とそのブロックを表示する。</p>
+
+      <h3>10.2 ブロック</h3>
+      <p><b>ブロック</b>は敵ごとに持ち、<b>その敵への攻撃だけ</b>を防ぐ。その敵が行動するたびに（行動の解決前に）0へ戻す。つまり BLOCK の効果は直後のプレイヤーターン1回限り。そのターン中は複数枚の攻撃で共有して削られる。攻撃プレビューもブロック分を含めて表示する（プレビューではブロックを消費しない）。</p>
+      <pre><code>blocked = Math.min(target.block, finalAttack)
 dealt   = finalAttack - blocked
-cpu.block -= blocked
-cpu.hp  -= dealt</code></pre>
-      <p>CPUが攻撃しないターン（CHARGE・BLOCK）はシールドが無駄になるため、そのターンは防御を捨てて攻めに回せる。ブロック中のターンは、攻撃を控えて Boost（次ターン攻撃力アップ）などの準備に回す判断もある。溜め込みの現在値は常に表示され、次の ATTACK の予告にも合計が含まれる。</p>
+target.block -= blocked
+target.hp    -= dealt</code></pre>
+
+      <h3>10.3 敵のターン</h3>
+      <p>生き残っている敵が先頭から順に行動する。倒れた敵は行動しない。プレイヤーのシールドは敵の攻撃を順に吸収していく。途中でプレイヤーのHPが0になった時点で敗北となる。</p>
+      <p>敵が攻撃しないターン（CHARGE・BLOCK）はシールドが無駄になるため、そのターンは防御を捨てて攻めに回せる。ブロック中の敵がいるターンは、もう一方の敵を狙う、攻撃を控えて Boost（次ターン攻撃力アップ）などの準備に回す、といった判断がある。</p>
       <div class="docs-table-wrap"><table>
         <thead><tr><th>行動</th><th>効果</th></tr></thead>
         <tbody>
-          <tr><td><code>ATTACK n</code></td><td><code>n + cpu.charge</code> のダメージ。シールドで吸収した残りを <code>player.hp</code> から引き、<code>cpu.charge</code> を0に戻す</td></tr>
-          <tr><td><code>CHARGE n</code></td><td>攻撃しない。<code>cpu.charge += n</code></td></tr>
-          <tr><td><code>BLOCK n</code></td><td>攻撃しない。<code>cpu.block = n</code>。直後のプレイヤーターン中、プレイヤーの攻撃を合計 n まで防ぐ</td></tr>
+          <tr><td><code>ATTACK n</code></td><td><code>n + enemy.charge</code> のダメージ。シールドで吸収した残りを <code>player.hp</code> から引き、<code>enemy.charge</code> を0に戻す</td></tr>
+          <tr><td><code>CHARGE n</code></td><td>攻撃しない。<code>enemy.charge += n</code></td></tr>
+          <tr><td><code>BLOCK n</code></td><td>攻撃しない。<code>enemy.block = n</code>。直後のプレイヤーターン中、その敵への攻撃を合計 n まで防ぐ</td></tr>
         </tbody>
       </table></div>
     </section>
@@ -312,8 +321,8 @@ cpu.hp  -= dealt</code></pre>
     <section id="result">
       <h2>11. 勝敗</h2>
       <ul>
-        <li>プレイヤーの攻撃後にCPU HPが0以下 → <b>YOU WIN</b>（CPUターンへ進まず終了）</li>
-        <li>CPUの攻撃後にプレイヤーHPが0以下 → <b>GAME OVER</b></li>
+        <li>プレイヤーの攻撃後にすべての敵のHPが0以下 → <b>YOU WIN</b>（敵のターンへ進まず終了）</li>
+        <li>敵の攻撃後にプレイヤーHPが0以下 → <b>GAME OVER</b></li>
       </ul>
       <p>HPは0未満にならない。</p>
 
@@ -321,8 +330,8 @@ cpu.hp  -= dealt</code></pre>
       <p>勝利すると <b>REWARD</b> で報酬画面（11.2）に進み、そこから <b>NEXT BATTLE</b> で次の戦闘に進む。何戦目かと今のデッキ枚数は画面上部に <code>BATTLE #002 DECK 9</code> のように表示する。</p>
       <ul>
         <li><b>引き継ぐもの</b>：プレイヤーの残りHP（回復しない）と、報酬で入手・削除したデッキ</li>
-        <li><b>リセットするもの</b>：山札（その時点のデッキから作り直してシャッフル）・ポイント・シールド・ターン数・CPU（HP・行動パターンの位置・溜め込み・ブロック）</li>
-        <li>CPUは毎戦同じ（HP・行動パターンとも変わらない）</li>
+        <li><b>リセットするもの</b>：山札（その時点のデッキから作り直してシャッフル）・ポイント・シールド・ターン数・敵（HP・行動パターンの位置・溜め込み・ブロック）・攻撃の対象</li>
+        <li>敵は毎戦同じ（2体・HP・行動パターンとも変わらない）</li>
       </ul>
       <p>敗北すると <b>RETRY FROM #001</b> で1戦目からやり直す。デッキも構築画面のデッキに戻る。敗北画面には何戦目で敗れたかを表示する。<b>EDIT DECK</b> で構築に戻った場合も、次の戦闘は1戦目から始まる。</p>
 
@@ -365,13 +374,16 @@ cpu.hp  -= dealt</code></pre>
     temporaryEffects: TemporaryEffect[];
   };
 
-  cpu: {
+  enemies: Array<{
+    id: string; name: string;     // "enemy_1", "AEGIS A"
     hp: number; maxHp: number;
     actionPattern: CpuAction[];   // 先頭から順に実行し、ループする
     actionIndex: number;          // 次に実行する行動（予告）の位置
     charge: number;               // CHARGE で溜めた、次の ATTACK への上乗せ分
-    block: number;                // BLOCK の残量。CPUが次に行動するとき0に戻る
-  };
+    block: number;                // BLOCK の残量。その敵が次に行動するとき0に戻る
+  }>;
+  targetId: string;               // 攻撃の対象の敵
+  lastCpuActions: EnemyActionResult[]; // 直前の敵ターンで各敵が行った行動
 
   selectedCardId: string | null;
   currentRole: HandRoleResult | null;

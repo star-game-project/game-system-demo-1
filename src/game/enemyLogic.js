@@ -1,11 +1,11 @@
 /** 次のCPUターンに実行される行動（行動予告）。 */
-export function getCpuIntent(cpu) {
-  return cpu.actionPattern[cpu.actionIndex];
+export function getCpuIntent(enemy) {
+  return enemy.actionPattern[enemy.actionIndex];
 }
 
 /** 行動パターンを1つ進める。末尾の次は先頭に戻る。 */
-export function advanceCpuAction(cpu) {
-  cpu.actionIndex = (cpu.actionIndex + 1) % cpu.actionPattern.length;
+export function advanceCpuAction(enemy) {
+  enemy.actionIndex = (enemy.actionIndex + 1) % enemy.actionPattern.length;
 }
 
 /** その行動で与えるダメージ。ATTACK には現在の溜め込み分が上乗せされる。 */
@@ -23,4 +23,8 @@ export function cpuActionLabel(action, charge = 0) {
   if (action.type === "CHARGE") return `CHARGE +${action.value}`;
   if (action.type === "BLOCK") return `BLOCK ${action.value}`;
   return action.type;
+}
+
+export function aliveEnemies(enemies) {
+  return enemies.filter((enemy) => enemy.hp > 0);
 }

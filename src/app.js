@@ -187,10 +187,10 @@ function renderCpuIntent(cpu) {
   `;
 }
 
-function statusPanel(entity, label, modifier = "") {
+function statusPanel(entity, label, modifier = "", extraClass = "") {
   const percent = hpPercent(entity.hp, entity.maxHp);
   return `
-    <section class="fighter-status fighter-status--${modifier}">
+    <section class="fighter-status fighter-status--${modifier} ${extraClass}">
       <div class="fighter-status__heading">
         <div>
           <span class="eyebrow">${modifier === "cpu" ? "HOSTILE UNIT" : "ACTIVE PLAYER"}</span>
@@ -205,6 +205,25 @@ function statusPanel(entity, label, modifier = "") {
       ${modifier === "cpu" ? renderCpuIntent(entity) : ""}
     </section>
   `;
+}
+
+/** 敵の一覧。クリックした敵が攻撃の対象になる。倒れた敵は選べない。 */
+function renderEnemies(state) {
+  const target = engine.getTargetEnemy();
+  const panels = state.enemies.map((enemy) => {
+    const defeated = enemy.hp <= 0;
+    const targeted = !defeated && target?.id === enemy.id;
+    const tag = defeated ? "DEFEATED" : targeted ? "◎ TARGET" : "クリックで対象に";
+    return `
+      <div class="enemy-slot ${targeted ? "is-target" : ""} ${defeated ? "is-defeated" : ""}"
+        ${defeated ? "" : `data-target-id="${enemy.id}" role="button" tabindex="0"`}
+        aria-label="${enemy.name}${targeted ? "（攻撃の対象）" : ""}">
+        <span class="enemy-slot__tag">${tag}</span>
+        ${statusPanel(enemy, enemy.name, "cpu")}
+      </div>
+    `;
+  }).join("");
+  return `<div class="enemy-row">${panels}</div>`;
 }
 
 /** このターンに使ったカードの合計。 */
@@ -237,11 +256,13 @@ function getCenterDisplay(state) {
   }
 
   if (state.phase === PHASES.CPU_ATTACK || state.phase === PHASES.DEFEAT) {
-    const hit = state.lastCpuAttack;
+    const actions = state.lastCpuActions;
+    const taken = actions.reduce((sum, item) => sum + item.taken, 0);
+    const absorbed = actions.reduce((sum, item) => sum + item.absorbed, 0);
     return {
-      kicker: `ENEMY ${cpuActionLabel(hit.action, hit.charge)}`,
-      multiplier: hit.absorbed ? `SHIELD −${hit.absorbed}` : "",
-      value: `${hit.taken}`,
+      kicker: actions.map((item) => `${item.enemyName}: ${cpuActionLabel(item.action, item.charge)}`).join(" / "),
+      multiplier: absorbed ? `SHIELD −${absorbed}` : "",
+      value: `${taken}`,
       unit: "DAMAGE TAKEN",
       className: "combat-readout--enemy-hit",
     };
@@ -322,7 +343,8 @@ function renderPreview(state) {
             : `<div class="final-damage"><span>FINAL DAMAGE</span><strong>${preview?.finalAttack ?? "—"}</strong></div>`
         }
         <dl class="damage-formula">
-          <div><dt>ENEMY BLOCK</dt><dd>${preview ? `−${preview.blocked}` : `${state.cpu.block}`}</dd></div>
+          <div><dt>TARGET</dt><dd>${engine.getTargetEnemy()?.name ?? "—"}</dd></div>
+          <div><dt>ENEMY BLOCK</dt><dd>${preview ? `−${preview.blocked}` : `${engine.getTargetEnemy()?.block ?? 0}`}</dd></div>
           <div><dt>DEALT</dt><dd>${preview?.dealt ?? "—"}</dd></div>
         </dl>
         ${selected ? `<div class="selected-abilities">${abilityLabel(selected)}</div>` : `<p class="preview-hint">手札を選ぶと、常在効果と役を含む最終ダメージを確認できます。</p>`}
@@ -519,7 +541,7 @@ function renderResult(state) {
         <span class="result-dialog__mark">${victory ? "◆" : "×"}</span>
         <span class="eyebrow">${victory ? "TARGET ELIMINATED" : "UNIT DISABLED"}</span>
         <h2 id="result-title">${victory ? "YOU WIN" : "GAME OVER"}</h2>
-        <p>${victory ? `${state.turn}ターンでCPUを撃破しました。HPは${state.player.hp}のまま次の戦闘へ進みます。` : `${state.battle}戦目で敗れました（突破 ${state.battle - 1}戦）。`}</p>
+        <p>${victory ? `${state.turn}ターンで敵をすべて撃破しました。HPは${state.player.hp}のまま次の戦闘へ進みます。` : `${state.battle}戦目で敗れました（突破 ${state.battle - 1}戦）。`}</p>
         <div class="result-stats">
           <span><small>BATTLE</small><b>${state.battle}</b></span>
           <span><small>TURN</small><b>${state.turn}</b></span>
@@ -880,7 +902,7 @@ function render() {
 
       <div class="battle-layout">
         <div class="battle-board">
-          ${statusPanel(state.cpu, "CPU // AEGIS", "cpu")}
+          ${renderEnemies(state)}
           ${renderCenter(state)}
           <div class="player-zone">
             ${statusPanel(state.player, "PLAYER // DICER", "player")}
@@ -1026,6 +1048,16 @@ function bindEvents() {
       const key = button.dataset.rewardRemove;
       reward.removeKey = reward.removeKey === key ? null : key;
       render();
+    });
+  });
+
+  app.querySelectorAll("[data-target-id]").forEach((slot) => {
+    const select = () => {
+      if (engine.setTarget(slot.dataset.targetId)) render();
+    };
+    slot.addEventListener("click", select);
+    slot.addEventListener("keydown", (event) => {
+      if (event.key === "Enter" || event.key === " ") select();
     });
   });
 

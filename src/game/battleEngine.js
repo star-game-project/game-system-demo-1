@@ -2,7 +2,7 @@ import { GAME_CONFIG, PHASES } from "../data/constants.js";
 import { drawWithRecycle } from "./deckLogic.js";
 import { evaluateHandRole } from "./roleLogic.js";
 import { calculateAttack } from "./damageLogic.js";
-import { advanceCpuAction, cpuActionDamage, getCpuIntent } from "./enemyLogic.js";
+import { advanceCpuAction, aliveEnemies, cpuActionDamage, getCpuIntent } from "./enemyLogic.js";
 import { createTurnTotals } from "./gameState.js";
 import { recoverPoints } from "./pointRules.js";
 import {
@@ -106,11 +106,24 @@ export class BattleEngine {
     return { ...attack, ...this.applyCpuBlock(attack.finalAttack, false) };
   }
 
-  /** CPUのブロックで攻撃を減らす。commit が false のときはブロックを消費しない。 */
-  applyCpuBlock(damage, commit = true) {
-    const { cpu } = this.state;
-    const blocked = Math.min(cpu.block, damage);
-    if (commit) cpu.block -= blocked;
+  /** 攻撃の対象。選んだ敵が倒れていれば、生き残っている先頭の敵。 */
+  getTargetEnemy() {
+    const alive = aliveEnemies(this.state.enemies);
+    return alive.find((enemy) => enemy.id === this.state.targetId) ?? alive[0] ?? null;
+  }
+
+  /** 攻撃の対象を選ぶ。倒れた敵は選べない。 */
+  setTarget(enemyId) {
+    const enemy = this.state.enemies.find((item) => item.id === enemyId);
+    if (!enemy || enemy.hp <= 0) return false;
+    this.state.targetId = enemyId;
+    return true;
+  }
+
+  /** 対象の敵のブロックで攻撃を減らす。commit が false のときはブロックを消費しない。 */
+  applyCpuBlock(damage, commit = true, enemy = this.getTargetEnemy()) {
+    const blocked = Math.min(enemy?.block ?? 0, damage);
+    if (commit && enemy) enemy.block -= blocked;
     return { blocked, dealt: damage - blocked };
   }
 
@@ -219,9 +232,11 @@ export class BattleEngine {
       this.state.roleLevels,
     );
 
-    const { blocked, dealt } = this.applyCpuBlock(attack.finalAttack);
+    const target = this.getTargetEnemy();
+    const { blocked, dealt } = this.applyCpuBlock(attack.finalAttack, true, target);
     attack.blocked = blocked;
     attack.dealt = dealt;
+    attack.targetId = target.id;
     const damageText = blocked
       ? `${dealt}ダメージ（ブロック −${blocked}）`
       : `${dealt}ダメージ`;
@@ -230,21 +245,27 @@ export class BattleEngine {
     this.state.player.temporaryEffects.push(
       ...createTemporaryEffects(card, this.state.turn),
     );
-    this.state.cpu.hp = Math.max(0, this.state.cpu.hp - dealt);
+    target.hp = Math.max(0, target.hp - dealt);
     this.state.player.hand = this.state.player.hand.filter((item) => item.id !== card.id);
     this.state.player.discardPile.push(card);
     this.state.player.cardsPlayed += 1;
     this.state.currentRole = evaluateHandRole(this.state.player.hand, this.state.roleLevels);
-    this.state.lastAttack = { ...attack, cardName: card.name };
+    this.state.lastAttack = { ...attack, cardName: card.name, targetName: target.name };
     this.state.lastDefense = null;
     this.state.turnTotals.cards += 1;
     this.state.turnTotals.dealt += dealt;
     this.state.turnTotals.blocked += blocked;
     this.state.selectedCardId = null;
 
-    this.state.battleMessage = `${card.name} — ${damageText}！`;
+    const defeatedText = target.hp <= 0 ? ` ${target.name} を撃破！` : "";
+    this.state.battleMessage = `${card.name} → ${target.name} — ${damageText}！${defeatedText}`;
     // ターンは終了しない。ポイントが続く限り続けてカードを使える。
-    if (this.state.cpu.hp <= 0) this.state.phase = PHASES.VICTORY;
+    const alive = aliveEnemies(this.state.enemies);
+    if (!alive.length) {
+      this.state.phase = PHASES.VICTORY;
+    } else if (target.hp <= 0) {
+      this.state.targetId = alive[0].id;
+    }
     return attack;
   }
 
@@ -276,43 +297,53 @@ export class BattleEngine {
     if (this.state.phase !== PHASES.PLAYER_ATTACK) return false;
     this.state.phase = PHASES.CPU_ATTACK;
 
-    const { player, cpu } = this.state;
-    const action = getCpuIntent(cpu);
-    advanceCpuAction(cpu);
+    // 生き残っている敵が先頭から順に行動する。シールドは順に削られる。
+    const results = [];
+    for (const enemy of aliveEnemies(this.state.enemies)) {
+      results.push(this.resolveEnemyAction(enemy));
+      if (this.state.player.hp <= 0) break;
+    }
+    this.state.lastCpuActions = results;
+    this.state.battleMessage = results.map((result) => result.message).join(" ");
+    if (this.state.player.hp <= 0) this.state.phase = PHASES.DEFEAT;
+    return true;
+  }
 
-    // ブロックは直後のプレイヤーターン限り。CPUが次に行動する時点で消える。
-    cpu.block = 0;
+  /** 1体の敵の行動を解決する。 */
+  resolveEnemyAction(enemy) {
+    const { player } = this.state;
+    const action = getCpuIntent(enemy);
+    advanceCpuAction(enemy);
+    const base = { enemyId: enemy.id, enemyName: enemy.name, action, charge: 0, incoming: 0, absorbed: 0, taken: 0 };
+
+    // ブロックは直後のプレイヤーターン限り。その敵が次に行動する時点で消える。
+    enemy.block = 0;
 
     if (action.type === "BLOCK") {
-      cpu.block = action.value;
-      this.state.lastCpuAttack = { action, charge: 0, incoming: 0, absorbed: 0, taken: 0 };
-      this.state.battleMessage = `CPUは防御態勢。次のあなたのターン、合計${cpu.block}ダメージまで防ぎます。`;
-      return true;
+      enemy.block = action.value;
+      return { ...base, message: `${enemy.name}は防御態勢（次のあなたのターン、合計${enemy.block}まで防ぐ）。` };
     }
 
     if (action.type === "CHARGE") {
-      cpu.charge += action.value;
-      this.state.lastCpuAttack = { action, charge: 0, incoming: 0, absorbed: 0, taken: 0 };
-      this.state.battleMessage = `CPUは力を溜めている。次の攻撃 +${cpu.charge}。`;
-      return true;
+      enemy.charge += action.value;
+      return { ...base, message: `${enemy.name}は力を溜めている（次の攻撃 +${enemy.charge}）。` };
     }
 
-    const charge = cpu.charge;
+    const charge = enemy.charge;
     const incoming = cpuActionDamage(action, charge);
     const absorbed = Math.min(player.shield, incoming);
     const taken = incoming - absorbed;
 
-    cpu.charge = 0;
+    enemy.charge = 0;
     player.shield -= absorbed;
     player.hp = Math.max(0, player.hp - taken);
-    this.state.lastCpuAttack = { action, charge, incoming, absorbed, taken };
 
-    this.state.battleMessage = absorbed
-      ? `CPUの反撃。シールドが${absorbed}吸収し、${taken}ダメージを受けました。`
-      : `CPUの反撃。${incoming}ダメージを受けました。`;
-    if (player.hp <= 0) this.state.phase = PHASES.DEFEAT;
-    return true;
+    const message = absorbed
+      ? `${enemy.name}の攻撃。シールドが${absorbed}吸収し、${taken}ダメージ。`
+      : `${enemy.name}の攻撃。${incoming}ダメージ。`;
+    return { ...base, charge, incoming, absorbed, taken, message };
   }
+
 
   finishTurn() {
     if (this.state.phase !== PHASES.CPU_ATTACK) return false;

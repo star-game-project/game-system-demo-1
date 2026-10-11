@@ -42,7 +42,6 @@ const MEASURED_FREQUENCY = {
 
 const CONSTANT_LABELS = {
   PLAYER_MAX_HP: "プレイヤー最大HP",
-  CPU_MAX_HP: "CPU最大HP",
   START_POINT: "開始時ポイント（既定値）",
   MAX_POINT: "最大ポイント（既定値）",
   TURN_POINT_RECOVERY: "ターン終了時の回復量（既定値）",
@@ -111,7 +110,7 @@ function tacticalText(ability) {
     return "対象1枚を捨て、山札から1枚引く";
   }
   if (ability.type === "GAIN_SHIELD") {
-    return `シールドを ${ability.value} 得る（次のCPU攻撃を吸収）`;
+    return `シールドを ${ability.value} 得る（次の敵の攻撃を吸収）`;
   }
   return ability.type;
 }
@@ -186,7 +185,7 @@ table(
     [PHASES.DRAW_SELECT, "DRAW / SKIP を選ぶ"],
     [PHASES.CARD_SELECT, "カードを何枚でも使う（END TURN まで）"],
     [PHASES.PLAYER_ATTACK, "プレイヤーのターン終了（このターンの合計を表示）"],
-    [PHASES.CPU_ATTACK, "CPUの攻撃"],
+    [PHASES.CPU_ATTACK, "敵の行動（生き残っている敵が順に）"],
     [PHASES.POINT_RECOVERY, "ポイント回復と手札の引き直し"],
     [PHASES.VICTORY, "プレイヤーの勝利"],
     [PHASES.DEFEAT, "プレイヤーの敗北"],

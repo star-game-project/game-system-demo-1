@@ -1733,3 +1733,46 @@ a:focus-visible {
   position: static;
   margin-top: 24px;
 }
+
+.enemy-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 12px;
+  width: min(940px, calc(100% - 40px));
+  justify-self: center;
+  position: relative;
+  z-index: 3;
+}
+
+.enemy-row .fighter-status--cpu {
+  width: 100%;
+}
+
+.enemy-slot {
+  position: relative;
+  cursor: pointer;
+  border: 1px solid transparent;
+}
+
+.enemy-slot.is-target {
+  border-color: var(--cyan);
+}
+
+.enemy-slot.is-defeated {
+  cursor: default;
+  opacity: 0.4;
+}
+
+.enemy-slot__tag {
+  position: absolute;
+  top: 6px;
+  right: 10px;
+  z-index: 4;
+  font-size: 9px;
+  letter-spacing: 0.12em;
+  color: var(--muted);
+}
+
+.enemy-slot.is-target .enemy-slot__tag {
+  color: var(--cyan);
+}

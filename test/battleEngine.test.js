@@ -13,7 +13,7 @@ import { BattleEngine } from "../src/game/battleEngine.js";
 import { isTacticalCard, isWildCard } from "../src/game/abilityLogic.js";
 import { evaluateHandRole } from "../src/game/roleLogic.js";
 import { createInitialGameState } from "../src/game/gameState.js";
-import { CPU_ACTION_PATTERN } from "../src/data/enemies.js";
+import { CPU_ACTION_PATTERN, ENEMY_TYPES } from "../src/data/enemies.js";
 import { cpuActionDamage, getCpuIntent } from "../src/game/enemyLogic.js";
 
 /**
@@ -27,9 +27,17 @@ const TWENTY_CARD_COUNTS = Object.freeze({
 });
 const TWENTY_CARDS = 20;
 
-function twentyCardState(options) {
-  return createInitialGameState(() => 0.5, createDeckFromCounts(TWENTY_CARD_COUNTS), options);
+/**
+ * 敵1体の仕組み（行動・ブロック・溜め込みなど）を確かめるテストでは、敵を1体に絞る。
+ * 敵が複数いる場合の挙動は、末尾の「two enemies」のテストで確かめる。
+ */
+function twentyCardState(options, { enemies = 1 } = {}) {
+  const state = createInitialGameState(() => 0.5, createDeckFromCounts(TWENTY_CARD_COUNTS), options);
+  state.enemies = state.enemies.slice(0, enemies);
+  return state;
 }
+
+const ENEMY_MAX_HP = ENEMY_TYPES.aegis.maxHp;
 
 test("the default deck is a legal minimal build with one attack per die value", () => {
   const deck = createDemoDeck();
@@ -101,7 +109,7 @@ test("used card is included in role check and then moves to discard", () => {
   assert.equal(result.finalAttack, Math.round(10 * 0.575));
   assert.equal(engine.state.player.hand.length, 2);
   assert.equal(engine.state.player.discardPile.at(-1).id, "die_3");
-  assert.equal(engine.state.cpu.hp, GAME_CONFIG.CPU_MAX_HP - result.finalAttack);
+  assert.equal(engine.state.enemies[0].hp, ENEMY_MAX_HP - result.finalAttack);
 });
 
 test("CPU attacks, points recover with a max of ten, and turn advances", () => {
@@ -110,7 +118,7 @@ test("CPU attacks, points recover with a max of ten, and turn advances", () => {
   state.player.point = 8;
   const engine = new BattleEngine(state);
 
-  const intent = getCpuIntent(engine.state.cpu);
+  const intent = getCpuIntent(engine.state.enemies[0]);
   assert.equal(intent.type, "ATTACK");
 
   assert.equal(engine.startCpuTurn(), true);
@@ -351,7 +359,7 @@ test("shield absorbs the CPU attack before HP is touched", () => {
   engine.playTacticalCard("guard", []);
   engine.state.phase = PHASES.PLAYER_ATTACK;
   const hpBefore = engine.state.player.hp;
-  const incoming = getCpuIntent(engine.state.cpu).value;
+  const incoming = getCpuIntent(engine.state.enemies[0]).value;
 
   engine.startCpuTurn();
 
@@ -373,13 +381,13 @@ test("leftover shield does not carry into the next turn", () => {
 
 test("the CPU starts at the head of its action pattern", () => {
   const state = twentyCardState();
-  assert.equal(state.cpu.actionIndex, 0);
-  assert.deepEqual(getCpuIntent(state.cpu), CPU_ACTION_PATTERN[0]);
+  assert.equal(state.enemies[0].actionIndex, 0);
+  assert.deepEqual(getCpuIntent(state.enemies[0]), CPU_ACTION_PATTERN[0]);
 });
 
 test("the CPU performs exactly the announced action, then announces the next one", () => {
   const state = twentyCardState();
-  state.cpu.actionPattern = [
+  state.enemies[0].actionPattern = [
     { type: "ATTACK", value: 5 },
     { type: "ATTACK", value: 30 },
   ];
@@ -389,17 +397,17 @@ test("the CPU performs exactly the announced action, then announces the next one
   state.phase = PHASES.PLAYER_ATTACK;
   engine.startCpuTurn();
   assert.equal(state.player.hp, hpBefore - 5);
-  assert.deepEqual(state.lastCpuAttack.action, { type: "ATTACK", value: 5 });
-  assert.deepEqual(getCpuIntent(state.cpu), { type: "ATTACK", value: 30 });
+  assert.deepEqual(state.lastCpuActions[0].action, { type: "ATTACK", value: 5 });
+  assert.deepEqual(getCpuIntent(state.enemies[0]), { type: "ATTACK", value: 30 });
 
   engine.finishTurn();
   state.phase = PHASES.PLAYER_ATTACK;
   engine.startCpuTurn();
   assert.equal(state.player.hp, hpBefore - 35);
-  assert.deepEqual(getCpuIntent(state.cpu), { type: "ATTACK", value: 5 });
+  assert.deepEqual(getCpuIntent(state.enemies[0]), { type: "ATTACK", value: 5 });
 });
 
-test("one loop of the CPU pattern deals the same total as fourteen per turn", () => {
+test("one loop of one enemy's pattern deals seven per turn on average", () => {
   const state = twentyCardState();
   const engine = new BattleEngine(state);
   state.player.hp = 10_000;
@@ -410,13 +418,13 @@ test("one loop of the CPU pattern deals the same total as fourteen per turn", ()
     engine.finishTurn();
   }
 
-  assert.equal(10_000 - state.player.hp, 14 * CPU_ACTION_PATTERN.length);
-  assert.equal(state.cpu.charge, 0);
+  assert.equal(10_000 - state.player.hp, 7 * CPU_ACTION_PATTERN.length);
+  assert.equal(state.enemies[0].charge, 0);
 });
 
 test("CHARGE deals no damage and adds to the next attack, which then resets it", () => {
   const state = twentyCardState();
-  state.cpu.actionPattern = [
+  state.enemies[0].actionPattern = [
     { type: "CHARGE", value: 7 },
     { type: "CHARGE", value: 3 },
     { type: "ATTACK", value: 5 },
@@ -428,22 +436,22 @@ test("CHARGE deals no damage and adds to the next attack, which then resets it",
     state.phase = PHASES.PLAYER_ATTACK;
     engine.startCpuTurn();
     assert.equal(state.player.hp, hpBefore);
-    assert.equal(state.cpu.charge, expectedCharge);
+    assert.equal(state.enemies[0].charge, expectedCharge);
     engine.finishTurn();
   }
 
   state.phase = PHASES.PLAYER_ATTACK;
   engine.startCpuTurn();
   assert.equal(state.player.hp, hpBefore - 15);
-  assert.equal(state.cpu.charge, 0);
-  assert.equal(state.lastCpuAttack.charge, 10);
-  assert.equal(state.lastCpuAttack.incoming, 15);
+  assert.equal(state.enemies[0].charge, 0);
+  assert.equal(state.lastCpuActions[0].charge, 10);
+  assert.equal(state.lastCpuActions[0].incoming, 15);
 });
 
 test("shield absorbs a charged attack using its full damage", () => {
   const engine = engineWithHand([shieldCard(), card("a", 4), card("b", 4)]);
-  engine.state.cpu.actionPattern = [{ type: "ATTACK", value: 22 }];
-  engine.state.cpu.charge = 10;
+  engine.state.enemies[0].actionPattern = [{ type: "ATTACK", value: 22 }];
+  engine.state.enemies[0].charge = 10;
   engine.playTacticalCard("guard", []);
   engine.state.phase = PHASES.PLAYER_ATTACK;
   const hpBefore = engine.state.player.hp;
@@ -451,7 +459,7 @@ test("shield absorbs a charged attack using its full damage", () => {
   engine.startCpuTurn();
 
   assert.equal(engine.state.player.hp, hpBefore - (32 - 14));
-  assert.equal(engine.state.lastCpuAttack.absorbed, 14);
+  assert.equal(engine.state.lastCpuActions[0].absorbed, 14);
 });
 
 test("CPU action damage only counts charge on attacks", () => {
@@ -465,29 +473,29 @@ test("CPU block soaks player damage across attacks until it runs out", () => {
     card("b", 5, { attack: 20 }),
     card("c", 6, { attack: 20 }),
   ]);
-  engine.state.cpu.block = 30;
-  const hpBefore = engine.state.cpu.hp;
+  engine.state.enemies[0].block = 30;
+  const hpBefore = engine.state.enemies[0].hp;
 
   engine.selectCard("a");
   const preview = engine.getAttackPreview();
   assert.equal(preview.blocked, Math.min(30, preview.finalAttack));
-  assert.equal(engine.state.cpu.block, 30, "a preview must not spend the block");
+  assert.equal(engine.state.enemies[0].block, 30, "a preview must not spend the block");
 
   const first = engine.useSelectedCard();
   assert.equal(first.blocked, Math.min(30, first.finalAttack));
-  assert.equal(engine.state.cpu.hp, hpBefore - first.dealt);
+  assert.equal(engine.state.enemies[0].hp, hpBefore - first.dealt);
   assert.match(engine.state.battleMessage, /ブロック/);
 
   engine.selectCard("b");
   const second = engine.useSelectedCard();
   assert.equal(second.blocked, Math.min(30 - first.blocked, second.finalAttack));
   assert.equal(second.dealt, second.finalAttack - second.blocked);
-  assert.equal(engine.state.cpu.hp, hpBefore - first.dealt - second.dealt);
+  assert.equal(engine.state.enemies[0].hp, hpBefore - first.dealt - second.dealt);
 });
 
 test("BLOCK deals no damage, lasts one player turn, and clears when the CPU acts again", () => {
   const state = twentyCardState();
-  state.cpu.actionPattern = [
+  state.enemies[0].actionPattern = [
     { type: "BLOCK", value: 30 },
     { type: "ATTACK", value: 5 },
   ];
@@ -497,27 +505,27 @@ test("BLOCK deals no damage, lasts one player turn, and clears when the CPU acts
   state.phase = PHASES.PLAYER_ATTACK;
   engine.startCpuTurn();
   assert.equal(state.player.hp, hpBefore);
-  assert.equal(state.cpu.block, 30);
+  assert.equal(state.enemies[0].block, 30);
 
   engine.finishTurn();
-  assert.equal(state.cpu.block, 30, "the block covers the following player turn");
+  assert.equal(state.enemies[0].block, 30, "the block covers the following player turn");
 
   state.phase = PHASES.PLAYER_ATTACK;
   engine.startCpuTurn();
-  assert.equal(state.cpu.block, 0);
+  assert.equal(state.enemies[0].block, 0);
   assert.equal(state.player.hp, hpBefore - 5);
 });
 
 test("a fully blocked attack cannot win the battle", () => {
   const engine = engineWithHand([card("a", 4, { attack: 10 }), card("b", 5)]);
-  engine.state.cpu.hp = 1;
-  engine.state.cpu.block = 1000;
+  engine.state.enemies[0].hp = 1;
+  engine.state.enemies[0].block = 1000;
 
   engine.selectCard("a");
   const result = engine.useSelectedCard();
 
   assert.equal(result.dealt, 0);
-  assert.equal(engine.state.cpu.hp, 1);
+  assert.equal(engine.state.enemies[0].hp, 1);
   assert.equal(engine.state.phase, PHASES.CARD_SELECT);
 });
 
@@ -556,7 +564,7 @@ test("defense cards are not tactical cards", () => {
 
 test("the shield from a defense card absorbs the following CPU attack", () => {
   const engine = engineWithHand([defenseCard(), card("a", 4)]);
-  engine.state.cpu.actionPattern = [{ type: "ATTACK", value: 14 }];
+  engine.state.enemies[0].actionPattern = [{ type: "ATTACK", value: 14 }];
   const hpBefore = engine.state.player.hp;
 
   engine.selectCard("brace");
@@ -601,7 +609,7 @@ test("the role is re-evaluated on the shrinking hand after each card", () => {
 
 test("the battle ends the moment the CPU dies, mid-turn", () => {
   const engine = engineWithHand([card("a", 4), card("b", 4)]);
-  engine.state.cpu.hp = 1;
+  engine.state.enemies[0].hp = 1;
 
   engine.selectCard("a");
   engine.useSelectedCard();
@@ -616,7 +624,7 @@ test("turn totals add up every card played and reset next turn", () => {
     defenseCard(),
     card("b", 6, { attack: 10 }),
   ]);
-  engine.state.cpu.actionPattern = [{ type: "ATTACK", value: 1 }];
+  engine.state.enemies[0].actionPattern = [{ type: "ATTACK", value: 1 }];
 
   engine.selectCard("a");
   const first = engine.useSelectedCard();
@@ -645,8 +653,8 @@ test("a new battle in a run carries over the battle count and remaining HP only"
   assert.equal(state.player.hp, 42);
   assert.equal(state.player.maxHp, GAME_CONFIG.PLAYER_MAX_HP);
   assert.equal(state.player.point, GAME_CONFIG.START_POINT);
-  assert.equal(state.cpu.hp, GAME_CONFIG.CPU_MAX_HP);
-  assert.equal(state.cpu.actionIndex, 0);
+  assert.equal(state.enemies[0].hp, ENEMY_MAX_HP);
+  assert.equal(state.enemies[0].actionIndex, 0);
   assert.equal(state.turn, 1);
 });
 
@@ -670,4 +678,100 @@ test("a new battle starts with the carried role levels", () => {
   const state = twentyCardState({ roleLevels: { odd_only: 2 } });
   assert.deepEqual(state.roleLevels, { odd_only: 2 });
   assert.deepEqual(twentyCardState().roleLevels, {});
+});
+
+test("two enemies start in step and together deal fourteen per turn on average", () => {
+  const state = twentyCardState(undefined, { enemies: 2 });
+  assert.equal(state.enemies.length, 2);
+  assert.equal(state.enemies.reduce((sum, enemy) => sum + enemy.maxHp, 0), 100);
+  const engine = new BattleEngine(state);
+  state.player.hp = 10_000;
+
+  for (let i = 0; i < CPU_ACTION_PATTERN.length; i += 1) {
+    state.phase = PHASES.PLAYER_ATTACK;
+    engine.startCpuTurn();
+    assert.equal(state.enemies[0].actionIndex, state.enemies[1].actionIndex);
+    engine.finishTurn();
+  }
+  assert.equal(10_000 - state.player.hp, 14 * CPU_ACTION_PATTERN.length);
+});
+
+test("attacks hit the chosen target, and a defeated target cannot be chosen", () => {
+  const engine = engineWithHand([card("a", 4, { attack: 10 }), card("b", 5, { attack: 10 }), card("c", 1)]);
+  engine.state.enemies = createInitialGameState(() => 0.5).enemies;
+  const [first, second] = engine.state.enemies;
+
+  assert.equal(engine.getTargetEnemy().id, first.id, "the first enemy is the default target");
+  assert.equal(engine.setTarget(second.id), true);
+  engine.selectCard("a");
+  const result = engine.useSelectedCard();
+  assert.equal(result.targetId, second.id);
+  assert.equal(second.hp, ENEMY_MAX_HP - result.dealt);
+  assert.equal(first.hp, ENEMY_MAX_HP);
+
+  second.hp = 0;
+  assert.equal(engine.setTarget(second.id), false);
+  assert.equal(engine.setTarget("nobody"), false);
+});
+
+test("defeating the target moves the target to the next living enemy", () => {
+  const engine = engineWithHand([card("a", 4, { attack: 10 }), card("b", 5), card("c", 1)]);
+  engine.state.enemies = createInitialGameState(() => 0.5).enemies;
+  const [first, second] = engine.state.enemies;
+  first.hp = 1;
+
+  engine.selectCard("a");
+  engine.useSelectedCard();
+
+  assert.equal(first.hp, 0);
+  assert.equal(engine.state.targetId, second.id);
+  assert.equal(engine.state.phase, PHASES.CARD_SELECT, "the battle goes on while an enemy is alive");
+  assert.match(engine.state.battleMessage, /撃破/);
+});
+
+test("the battle is won only when every enemy is down", () => {
+  const engine = engineWithHand([card("a", 4, { attack: 10 }), card("b", 5, { attack: 10 }), card("c", 1)]);
+  engine.state.enemies = createInitialGameState(() => 0.5).enemies;
+  engine.state.enemies.forEach((enemy) => { enemy.hp = 1; });
+
+  engine.selectCard("a");
+  engine.useSelectedCard();
+  assert.equal(engine.state.phase, PHASES.CARD_SELECT);
+  engine.selectCard("b");
+  engine.useSelectedCard();
+  assert.equal(engine.state.phase, PHASES.VICTORY);
+});
+
+test("each enemy's block only protects that enemy", () => {
+  const engine = engineWithHand([card("a", 4, { attack: 10 }), card("b", 5), card("c", 1)]);
+  engine.state.enemies = createInitialGameState(() => 0.5).enemies;
+  const [first, second] = engine.state.enemies;
+  first.block = 100;
+
+  engine.setTarget(second.id);
+  engine.selectCard("a");
+  const result = engine.useSelectedCard();
+  assert.equal(result.blocked, 0);
+  assert.equal(first.block, 100);
+});
+
+test("defeated enemies do not act, and the shield is shared across enemy attacks", () => {
+  const state = twentyCardState(undefined, { enemies: 2 });
+  state.enemies.forEach((enemy) => { enemy.actionPattern = [{ type: "ATTACK", value: 10 }]; });
+  const engine = new BattleEngine(state);
+  const hpBefore = state.player.hp;
+
+  state.player.shield = 15;
+  state.phase = PHASES.PLAYER_ATTACK;
+  engine.startCpuTurn();
+  // 1体目の10をすべて吸収し、残り5で2体目の10のうち5を吸収する。
+  assert.deepEqual(state.lastCpuActions.map((item) => [item.absorbed, item.taken]), [[10, 0], [5, 5]]);
+  assert.equal(state.player.hp, hpBefore - 5);
+  engine.finishTurn();
+
+  state.enemies[1].hp = 0;
+  state.phase = PHASES.PLAYER_ATTACK;
+  engine.startCpuTurn();
+  assert.equal(state.lastCpuActions.length, 1);
+  assert.equal(state.player.hp, hpBefore - 15);
 });

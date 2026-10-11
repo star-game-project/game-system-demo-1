@@ -1,6 +1,6 @@
 import { GAME_CONFIG, PHASES } from "../data/constants.js";
 import { createDemoDeck } from "../data/cards.js";
-import { CPU_ACTION_PATTERN } from "../data/enemies.js";
+import { createEnemies } from "../data/enemies.js";
 import { drawCards, shuffleDeck } from "./deckLogic.js";
 import { evaluateHandRole } from "./roleLogic.js";
 import { DEFAULT_POINT_RULES, normalizePointRules } from "./pointRules.js";
@@ -48,18 +48,15 @@ export function createInitialGameState(
       shield: 0,
       temporaryEffects: [],
     },
-    cpu: {
-      hp: GAME_CONFIG.CPU_MAX_HP,
-      maxHp: GAME_CONFIG.CPU_MAX_HP,
-      actionPattern: CPU_ACTION_PATTERN,
-      actionIndex: 0,
-      charge: 0,
-      block: 0,
-    },
+    enemies: createEnemies(),
+    // 攻撃の対象。倒れたら生き残っている先頭の敵に移る。
+    targetId: "enemy_1",
     selectedCardId: null,
     currentRole: evaluateHandRole(openingDraw.drawn, roleLevels),
     lastAttack: null,
     lastDefense: null,
+    // 直前の敵ターンで各敵が行った行動。
+    lastCpuActions: [],
     turnTotals: createTurnTotals(),
     battleMessage: `${GAME_CONFIG.START_HAND_SIZE}枚のカードをドロー。あなたのターンです。`,
   };

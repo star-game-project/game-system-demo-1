@@ -333,7 +333,19 @@ cpu.hp  -= dealt</code></pre>
         <li><b>削除</b>：今のデッキから<b>1枚まで</b>削除する。入手分を含めたデッキが最小枚数（6枚）を下回る削除はできない。</li>
         <li>構築画面の制約（目の上限・同名の上限・最大20枚）は、連戦中のデッキには掛けない。</li>
       </ul>
-      <p>報酬画面には残りHP、今のデッキの全カードと枚数、確定後のデッキ枚数を表示する。ロジックは <code>src/game/rewardLogic.js</code>、枚数は <code>REWARD_RULES</code> で管理する。</p>
+      <p>報酬画面には残りHP、今のデッキの全カードと枚数、確定後のデッキ枚数、現在の役のレベルを表示する。ロジックは <code>src/game/rewardLogic.js</code>、枚数は <code>REWARD_RULES</code> で管理する。</p>
+
+      <h3>11.3 役の強化</h3>
+      <p>報酬画面では、カードの入手・削除とは別に、<b>ボーナス役から重複なし・等確率で選んだ3つの候補のうち1つまで</b>を強化できる（任意）。強化するとその役のレベルが1上がり、倍率に <b>+0.1</b>（<code>ROLE_GROWTH.UPGRADE_STEP</code>）を足す。</p>
+      <pre><code>倍率 = 元の倍率 + レベル × 0.1     // 例：PAIR ×1.1 → Lv2 で ×1.3</code></pre>
+      <ul>
+        <li>系統をまたいで倍率は掛け合わさるため、強化は掛け算ではなく<b>足し算</b>にしている。</li>
+        <li>減算役（1-2-3）は強化の対象外。</li>
+        <li>系統ごとに採る役は、<b>強化後の倍率</b>で比べる。そのため強化した下位の役が上位を追い越すことがある（例：PAIR を ×1.3 にすると、TWO PAIR ×1.25 の手札でも PAIR を採る）。ワイルドの目の選び方も強化後の倍率に従う。</li>
+        <li>レベルは連戦中に引き継ぎ、1戦目からやり直すと0に戻る。</li>
+        <li>上げ幅は当面一律。役の成立しやすさに合わせた調整は今後行う。</li>
+      </ul>
+      <p>戦闘中の役一覧（「役」ボタン）と報酬画面の役一覧には、強化後の倍率と元の倍率・レベルを表示する。</p>
     </section>
 
     <section id="state">
@@ -341,6 +353,7 @@ cpu.hp  -= dealt</code></pre>
       <pre><code>type GameState = {
   battle: number;               // 連戦の何戦目か（1始まり）
   pointRules: { startPoint: number; maxPoint: number; recovery: number; fullRefill: boolean };
+  roleLevels: { [roleId: string]: number }; // 役の強化レベル（連戦中に引き継ぐ）
   turn: number;
   phase: GamePhase;
 

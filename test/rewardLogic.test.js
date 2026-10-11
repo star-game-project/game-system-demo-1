@@ -2,11 +2,14 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { CARD_BY_KEY, CARD_CATALOGUE, DEFAULT_DECK_COUNTS } from "../src/data/cards.js";
 import { DECK_RULES, REWARD_RULES } from "../src/data/constants.js";
+import { BONUS_ROLES } from "../src/data/roles.js";
 import {
   applyReward,
+  applyRoleUpgrade,
   canRemoveFromRun,
   countCards,
   drawRewardOffers,
+  drawRoleOffers,
 } from "../src/game/rewardLogic.js";
 
 const minimal = () => ({ ...DEFAULT_DECK_COUNTS });
@@ -67,4 +70,30 @@ test("removal cannot shrink the deck below the minimum size", () => {
   // 同時に1枚入手するなら、最小枚数を保てるので削除できる。
   assert.equal(canRemoveFromRun(atMinimum, "heavy_6", "guard"), true);
   assert.equal(canRemoveFromRun(atMinimum, "guard"), false, "a card not in the deck cannot be removed");
+});
+
+test("role offers are distinct bonus roles, never the penalty", () => {
+  let state = 3;
+  const random = () => {
+    state = (state * 16807) % 2147483647;
+    return state / 2147483647;
+  };
+  const seen = new Set();
+  for (let index = 0; index < 300; index += 1) {
+    const offers = drawRoleOffers(random);
+    assert.equal(offers.length, REWARD_RULES.ROLE_OFFER_COUNT);
+    assert.equal(new Set(offers).size, offers.length);
+    offers.forEach((id) => seen.add(id));
+  }
+  assert.ok(!seen.has("one_two_three"));
+  assert.deepEqual([...seen].sort(), BONUS_ROLES.map((role) => role.id).sort());
+});
+
+test("upgrading a role raises its level by one and is optional", () => {
+  const levels = { pair: 1 };
+  assert.deepEqual(applyRoleUpgrade(levels, ["pair", "odd_only"], "pair"), { pair: 2 });
+  assert.deepEqual(applyRoleUpgrade(levels, ["pair", "odd_only"], "odd_only"), { pair: 1, odd_only: 1 });
+  assert.deepEqual(applyRoleUpgrade(levels, ["pair"], null), levels);
+  assert.deepEqual(applyRoleUpgrade(levels, ["pair"], "full_house"), levels, "only an offered role can be upgraded");
+  assert.deepEqual(levels, { pair: 1 }, "the input levels are not mutated");
 });

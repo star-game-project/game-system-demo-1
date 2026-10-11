@@ -12,7 +12,7 @@ import {
   DEFAULT_DECK_COUNTS,
   createDeckFromCounts,
 } from "./data/cards.js";
-import { BONUS_ROLES, PENALTY_ROLES } from "./data/roles.js";
+import { BONUS_ROLES, PENALTY_ROLES, ROLE_BY_ID, ROLE_GROWTH, upgradedMultiplier } from "./data/roles.js";
 import {
   addCard,
   bucketLimit,
@@ -42,9 +42,11 @@ import {
 } from "./game/pointRules.js";
 import {
   applyReward,
+  applyRoleUpgrade,
   canRemoveFromRun,
   countCards,
   drawRewardOffers,
+  drawRoleOffers,
 } from "./game/rewardLogic.js";
 
 const app = document.querySelector("#app");
@@ -60,12 +62,15 @@ let pointRules = { ...DEFAULT_POINT_RULES };
 let pendingTactical = null;
 // 連戦中のデッキ（カードごとの枚数）。構築画面のデッキから始まり、報酬で入手・削除して育つ。
 let runCounts = null;
-// 報酬画面の状態：{ offers, gainKey, removeKey, battle, playerHp }
+// 連戦中の役の強化レベル（{ 役id: レベル }）。報酬で上がり、1戦目からやり直すと消える。
+let runRoleLevels = {};
+// 報酬画面の状態：{ offers, gainKey, removeKey, roleOffers, roleKey, battle, playerHp }
 let reward = null;
 
 /** 構築画面のデッキで、1戦目から連戦を始める。 */
 function startRun() {
   runCounts = { ...deckCounts };
+  runRoleLevels = {};
   startBattle();
 }
 
@@ -75,7 +80,11 @@ function startBattle(carry = {}) {
   pendingTactical = null;
   reward = null;
   engine = new BattleEngine(
-    createInitialGameState(Math.random, createDeckFromCounts(runCounts), { pointRules, ...carry }),
+    createInitialGameState(Math.random, createDeckFromCounts(runCounts), {
+      pointRules,
+      roleLevels: runRoleLevels,
+      ...carry,
+    }),
   );
   screen = SCREENS.BATTLE;
 }
@@ -86,6 +95,8 @@ function openReward() {
     offers: drawRewardOffers(),
     gainKey: null,
     removeKey: null,
+    roleOffers: drawRoleOffers(),
+    roleKey: null,
     battle: state.battle,
     playerHp: state.player.hp,
   };
@@ -576,14 +587,21 @@ function renderCatalogue() {
   }).join("");
 }
 
-function renderRoleTable() {
-  // 倍率の高い順に並べ、減算役は最後にまとめる。
+/** 強化レベルを含む倍率の表記。強化済みなら元の倍率とレベルも添える。 */
+function roleMultiplierText(role, levels = {}) {
+  const level = levels[role.id] ?? 0;
+  const current = multiplierLabel(upgradedMultiplier(role, levels));
+  return level ? `${current} <small>(${multiplierLabel(role.multiplier)} Lv${level})</small>` : current;
+}
+
+function renderRoleTable(levels = {}) {
+  // 倍率の高い順に並べ、減算役は最後にまとめる（並びは強化前の倍率）。
   return [...BONUS_ROLES, ...PENALTY_ROLES].map(
     (role) => `
       <div class="role-table__row ${role.kind === "penalty" ? "role-table__row--risk" : ""}">
         <span>${role.name}</span>
         <small>${role.description} · 系統 ${role.family}</small>
-        <b>${multiplierLabel(role.multiplier)}</b>
+        <b>${roleMultiplierText(role, levels)}</b>
       </div>
     `,
   ).join("");
@@ -596,17 +614,21 @@ const ROLE_RULE_HINT =
  * 戦闘中に役一覧を開くダイアログ。render() は #app を丸ごと書き換えるため、
  * CPUターンの再描画で閉じないよう #app の外に一度だけ作る。
  */
-function createRoleDialog() {
-  const dialog = document.createElement("dialog");
-  dialog.className = "role-dialog";
-  dialog.innerHTML = `
+function renderRoleDialogBody(levels) {
+  return `
     <form method="dialog" class="role-table">
       <span class="eyebrow">ROLE LIST</span>
       <p class="role-table__hint">${ROLE_RULE_HINT}</p>
-      ${renderRoleTable()}
+      ${renderRoleTable(levels)}
       <button class="command-button command-button--secondary">CLOSE</button>
     </form>
   `;
+}
+
+function createRoleDialog() {
+  const dialog = document.createElement("dialog");
+  dialog.className = "role-dialog";
+  dialog.innerHTML = renderRoleDialogBody({});
   // 枠の外（背景）をクリックしても閉じる。
   dialog.addEventListener("click", (event) => {
     if (event.target === dialog) dialog.close();
@@ -696,6 +718,27 @@ function renderReward() {
     });
   }).join("");
 
+  const { roleOffers, roleKey } = reward;
+  const roleCards = roleOffers.map((id) => {
+    const role = ROLE_BY_ID[id];
+    const level = runRoleLevels[id] ?? 0;
+    const selected = roleKey === id;
+    return `
+      <article class="catalogue-card ${selected ? "is-included reward-card--selected" : ""}">
+        <header>
+          <span class="catalogue-card__die">×</span>
+          <div>
+            <strong>${role.name} <small>Lv${level} → Lv${level + 1}</small></strong>
+            <small>${multiplierLabel(upgradedMultiplier(role, runRoleLevels))} → ${multiplierLabel(upgradedMultiplier(role, { [id]: level + 1 }))} / 系統 ${role.family}</small>
+          </div>
+        </header>
+        <span class="ability ability--none">${role.description}</span>
+        <button type="button" class="command-button command-button--secondary" data-reward-role="${id}">${selected ? "選択中（もう一度で解除）" : "この役を強化"}</button>
+      </article>
+    `;
+  }).join("");
+  const roleText = roleKey ? `${ROLE_BY_ID[roleKey].name} を強化` : "強化しない";
+
   const gainText = gainKey ? `${CARD_BY_KEY[gainKey].name} を入手` : "入手しない";
   const removeText = removeKey ? `${CARD_BY_KEY[removeKey].name} を1枚削除` : "削除しない";
 
@@ -708,13 +751,13 @@ function renderReward() {
         </a>
         <div class="topbar__center"><span>CLEARED</span><strong>#${String(battle).padStart(3, "0")}</strong></div>
         <button class="command-button command-button--primary" data-action="next-battle">
-          <span>NEXT BATTLE</span><small>${gainText} / ${removeText}</small>
+          <span>NEXT BATTLE</span><small>${gainText} / ${removeText} / ${roleText}</small>
         </button>
       </header>
 
       <section class="point-rules">
         <div><span class="eyebrow">RUN STATUS</span><strong>HP ${playerHp} / ${GAME_CONFIG.PLAYER_MAX_HP}（回復なし） · デッキ ${countCards(runCounts)}枚 → ${countCards(result)}枚</strong></div>
-        <small>候補${REWARD_RULES.OFFER_COUNT}枚から${REWARD_RULES.MAX_GAINS}枚まで入手し、デッキから${REWARD_RULES.MAX_REMOVALS}枚まで削除できます（どちらも任意）。削除は${DECK_RULES.MIN_DECK_SIZE}枚を下回らない範囲で行えます。</small>
+        <small>候補${REWARD_RULES.OFFER_COUNT}枚から${REWARD_RULES.MAX_GAINS}枚まで入手し、デッキから${REWARD_RULES.MAX_REMOVALS}枚まで削除し、候補${REWARD_RULES.ROLE_OFFER_COUNT}つの役から${REWARD_RULES.MAX_ROLE_UPGRADES}つまで強化できます（いずれも任意）。削除は${DECK_RULES.MIN_DECK_SIZE}枚を下回らない範囲で行えます。</small>
       </section>
 
       <section class="catalogue">
@@ -725,6 +768,16 @@ function renderReward() {
       <section class="catalogue">
         <div class="build-heading"><div><span class="eyebrow">REMOVE</span><h2>今のデッキ（1枚まで削除）</h2></div></div>
         <div class="catalogue-grid">${deckCards}</div>
+      </section>
+
+      <section class="catalogue">
+        <div class="build-heading"><div><span class="eyebrow">ROLE UPGRADE</span><h2>役の強化（1つまで・倍率 +${ROLE_GROWTH.UPGRADE_STEP}）</h2></div></div>
+        <div class="catalogue-grid">${roleCards}</div>
+      </section>
+
+      <section class="role-table">
+        <span class="eyebrow">ROLE LIST（現在のレベル）</span>
+        ${renderRoleTable(runRoleLevels)}
       </section>
     </main>
   `;
@@ -960,6 +1013,14 @@ function bindEvents() {
     });
   });
 
+  app.querySelectorAll("[data-reward-role]").forEach((button) => {
+    button.addEventListener("click", () => {
+      const id = button.dataset.rewardRole;
+      reward.roleKey = reward.roleKey === id ? null : id;
+      render();
+    });
+  });
+
   app.querySelectorAll("[data-reward-remove]").forEach((button) => {
     button.addEventListener("click", () => {
       const key = button.dataset.rewardRemove;
@@ -979,7 +1040,11 @@ function bindEvents() {
       event.preventDefault();
       const action = button.dataset.action;
 
-      if (action === "show-roles") roleDialog.showModal();
+      if (action === "show-roles") {
+        // 強化レベルは連戦中に変わるため、開くたびに作り直す。
+        roleDialog.innerHTML = renderRoleDialogBody(engine?.state.roleLevels ?? runRoleLevels);
+        roleDialog.showModal();
+      }
       if (action === "draw" && engine.chooseDraw(true)) render();
       if (action === "skip" && engine.chooseDraw(false)) render();
       if (action === "cancel-tactical") {
@@ -1019,6 +1084,7 @@ function bindEvents() {
       }
       if (action === "next-battle" && reward) {
         runCounts = applyReward(runCounts, reward.offers, reward);
+        runRoleLevels = applyRoleUpgrade(runRoleLevels, reward.roleOffers, reward.roleKey);
         startBattle({ battle: reward.battle + 1, playerHp: reward.playerHp });
         render();
       }

@@ -12,7 +12,8 @@ export function createTurnTotals() {
 
 /**
  * 戦闘の初期状態。連戦では battle（何戦目か）と playerHp（前の戦闘の残りHP）を引き継ぐ。
- * それ以外（山札・ポイント・CPU）は毎戦リセットする。pointRules は構築画面で選んだポイント設定。
+ * それ以外（山札・ポイント・CPU）は毎戦リセットする。pointRules は構築画面で選んだポイント設定、
+ * roleLevels は報酬で強化した役のレベル。
  */
 export function createInitialGameState(
   random = Math.random,
@@ -21,6 +22,7 @@ export function createInitialGameState(
     battle = 1,
     playerHp = GAME_CONFIG.PLAYER_MAX_HP,
     pointRules = DEFAULT_POINT_RULES,
+    roleLevels = {},
   } = {},
 ) {
   const rules = normalizePointRules(pointRules);
@@ -30,6 +32,8 @@ export function createInitialGameState(
   return {
     battle,
     pointRules: rules,
+    // 役の強化レベル（{ 役id: レベル }）。連戦中に報酬で上がる。
+    roleLevels: { ...roleLevels },
     turn: 1,
     phase: PHASES.DRAW_SELECT,
     player: {
@@ -53,7 +57,7 @@ export function createInitialGameState(
       block: 0,
     },
     selectedCardId: null,
-    currentRole: evaluateHandRole(openingDraw.drawn),
+    currentRole: evaluateHandRole(openingDraw.drawn, roleLevels),
     lastAttack: null,
     lastDefense: null,
     turnTotals: createTurnTotals(),

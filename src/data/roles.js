@@ -158,3 +158,19 @@ export const BONUS_ROLES = Object.freeze(
     (a, b) => b.multiplier - a.multiplier || b.priority - a.priority,
   ),
 );
+
+/**
+ * 役の強化（成長）。報酬で選んだボーナス役のレベルを1上げ、倍率に UPGRADE_STEP を足す。
+ * 系統をまたいで倍率は掛け合わさるため、強化は掛け算ではなく足し算にしている。
+ * 減算役は強化の対象外。上げ幅は当面一律（成立しやすさに合わせた調整は今後）。
+ */
+export const ROLE_GROWTH = Object.freeze({
+  UPGRADE_STEP: 0.1,
+});
+
+/** レベルを反映した倍率。levels は { 役id: レベル }。 */
+export function upgradedMultiplier(role, levels = {}) {
+  if (role.kind !== "bonus") return role.multiplier;
+  const level = levels[role.id] ?? 0;
+  return Number((role.multiplier + level * ROLE_GROWTH.UPGRADE_STEP).toFixed(3));
+}

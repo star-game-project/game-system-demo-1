@@ -20,11 +20,16 @@ export const DECK_RULES = Object.freeze({
   MAX_COPIES_PER_CARD: 4,
 });
 
-/** 勝利後の報酬。候補からカードを1枚まで入手し、デッキから1枚まで削除できる（どちらも任意）。 */
+/**
+ * 勝利後の報酬。候補からカードを1枚まで入手し、デッキから1枚まで削除し、
+ * 候補の役を1つまで強化できる（いずれも任意で、同時に選べる）。
+ */
 export const REWARD_RULES = Object.freeze({
   OFFER_COUNT: 3,
   MAX_GAINS: 1,
   MAX_REMOVALS: 1,
+  ROLE_OFFER_COUNT: 3,
+  MAX_ROLE_UPGRADES: 1,
 });
 
 export const SCREENS = Object.freeze({

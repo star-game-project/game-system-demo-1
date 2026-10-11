@@ -1,8 +1,8 @@
 import { evaluateHandRole } from "./roleLogic.js";
 import { getPassiveBonus, getTemporaryBonus } from "./abilityLogic.js";
 
-export function calculateAttack(card, hand, playerState, turn) {
-  const role = evaluateHandRole(hand);
+export function calculateAttack(card, hand, playerState, turn, roleLevels = {}) {
+  const role = evaluateHandRole(hand, roleLevels);
   const passiveBonus = getPassiveBonus(card, hand);
   const temporaryBonus = getTemporaryBonus(playerState.temporaryEffects, turn);
   const adjustedAttack = card.attack + passiveBonus + temporaryBonus;

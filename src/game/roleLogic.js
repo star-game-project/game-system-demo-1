@@ -1,4 +1,4 @@
-import { ROLE_FAMILIES } from "../data/roles.js";
+import { HAND_ROLES, upgradedMultiplier } from "../data/roles.js";
 import { isWildCard, MAX_DIE_VALUE, MIN_DIE_VALUE } from "./abilityLogic.js";
 
 const NO_ROLE = Object.freeze({
@@ -19,6 +19,19 @@ const DIE_VALUES = Array.from(
 
 // ワイルドが多い手札まで総当たりすると組み合わせが膨らむため上限を設ける。
 const MAX_WILD_SEARCH = 4;
+
+/**
+ * family ごとに、レベル反映後の倍率が高い順に並べた役。
+ * 強化で下位の役が上位を追い越すこともあるため、レベルごとに並べ直す。
+ */
+function familiesFor(levels) {
+  const roles = HAND_ROLES.map((role) => ({ ...role, multiplier: upgradedMultiplier(role, levels) }));
+  return [...new Set(roles.map((role) => role.family))].map((family) =>
+    roles
+      .filter((role) => role.family === family)
+      .sort((a, b) => b.multiplier - a.multiplier || b.priority - a.priority),
+  );
+}
 
 function meetsHandSize(role, handSize) {
   return handSize >= (role.minHandSize ?? 1);
@@ -86,7 +99,7 @@ function matchesRole(roleId, context) {
   }
 }
 
-function evaluateConcreteHand(values, handSize) {
+function evaluateConcreteHand(values, handSize, families) {
   const counts = tally(values);
   const distinct = [...counts.keys()].sort((a, b) => a - b);
   const context = {
@@ -98,7 +111,7 @@ function evaluateConcreteHand(values, handSize) {
   };
 
   // family ごとに最も倍率の高い役をひとつ選び、family をまたいで掛け合わせる。
-  const perFamily = ROLE_FAMILIES.map(({ roles: candidates }) =>
+  const perFamily = families.map((candidates) =>
     candidates.find(
       (role) => meetsHandSize(role, handSize) && matchesRole(role.id, context),
     ),
@@ -145,8 +158,10 @@ function wildAssignments(count, start = 0) {
   return results;
 }
 
-export function evaluateHandRole(hand) {
+/** levels は役の強化レベル（{ 役id: レベル }）。省略時は強化なし。 */
+export function evaluateHandRole(hand, levels = {}) {
   if (!hand.length) return noRole();
+  const families = familiesFor(levels);
 
   const fixedValues = hand
     .filter((card) => !isWildCard(card))
@@ -154,7 +169,7 @@ export function evaluateHandRole(hand) {
   const wildCount = hand.length - fixedValues.length;
 
   if (wildCount === 0 || wildCount > MAX_WILD_SEARCH) {
-    return evaluateConcreteHand(fixedValues, hand.length);
+    return evaluateConcreteHand(fixedValues, hand.length, families);
   }
 
   // ワイルドはプレイヤーにとって最も有利になる目として扱う。
@@ -164,6 +179,7 @@ export function evaluateHandRole(hand) {
     const result = evaluateConcreteHand(
       [...fixedValues, ...assignment],
       hand.length,
+      families,
     );
     if (
       !best ||

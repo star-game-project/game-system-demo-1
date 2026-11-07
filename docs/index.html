@@ -54,7 +54,7 @@
         <li><b>BATTLE</b> — 構築したデッキで敵と戦う（5〜10章）</li>
         <li><b>REWARD</b> — 勝利後、カードの入手・削除と役の強化を行う（11.2・11.3）</li>
       </ul>
-      <p>戦闘は必ずデッキ構築から始まる。戦闘中はいつでも構築画面に戻れる（デッキ内容は保持される）。</p>
+      <p>戦闘は必ずデッキ構築から始まる。構築画面では最初に、どのルールで遊ぶかを選ぶ（3.5）。戦闘中はいつでも構築画面に戻れる（デッキ内容は保持される）。</p>
       <aside class="docs-callout docs-callout--demo" data-summary="構築画面は本番では置かない。本文の「構築画面」はタイトル画面と読み替える">
         <span class="docs-tag docs-tag--demo">デモ限定</span>
         <p>デッキ構築画面は、初期デッキを入れ替えて試すためのデモ限定の画面である。本番では置かない可能性が高く、初期デッキは固定にする（3章）。本文中の「構築画面」は、<b>タイトル画面と読み替えて</b>よい。</p>
@@ -113,6 +113,18 @@
       <h3>3.4 初期デッキ（初期構成・最小限）</h3>
       <p>目1〜6の攻撃カードを1枚ずつと、防御カード2枚の8枚。戦術カードや能力持ちのカードは、戦闘後の入手で増やしていく前提。</p>
       <div class="docs-table-wrap"><table id="default-deck-table"></table></div>
+
+      <h3>3.5 ルールの選択</h3>
+      <p>構築画面の <b>RULES</b> で、どのルールで遊ぶかを選ぶ。選んだルールは連戦中に引き継ぎ、戦闘画面の上部に表示する。途中で変えるには構築画面に戻る（次は1戦目から）。</p>
+      <div class="docs-table-wrap"><table id="ruleset-table"></table></div>
+      <aside class="docs-callout docs-callout--demo" data-summary="ルールの選択は、検討中の大きな変更を現行ルールと遊び比べるためのもの">
+        <span class="docs-tag docs-tag--demo">デモ限定</span>
+        <p>ルールを選べるのは、検討中の大きな変更を現行ルールと遊び比べるためのデモ限定の機能である。採用が決まれば、本番ではどちらか一方になる。</p>
+      </aside>
+      <aside class="docs-callout docs-callout--open" data-summary="ダイスの色による役（ポーカーのスートにあたる）。色の数・付き方・役の種類は未定">
+        <span class="docs-tag docs-tag--open">検討中</span>
+        <p>ポーカーの役がスートと数字の両方を使うように、ダイスの目に加えて<b>ダイスの色</b>でも役を作る案を試作している。色の数、色の付き方（カードの種類ごとか1枚ごとか）、色の役の種類は未定で、段階的に追加する。<b>現時点では「ダイスの色（試作）」を選んでも、現行ルールと同じ</b>に動く。</p>
+      </aside>
     </section>
 
     <section id="cards">
@@ -407,7 +419,7 @@ target.hp    -= dealt</code></pre>
       <h3>11.1 連戦</h3>
       <p>勝利すると <b>REWARD</b> で報酬画面（11.2）に進み、そこから <b>NEXT BATTLE</b> で次の戦闘に進む。何戦目かと今のデッキ枚数は画面上部に <code>BATTLE #002 DECK 9</code> のように表示する（表示の仕方はUI班と調整する。1.2）。</p>
       <ul>
-        <li><b>引き継ぐもの</b>：プレイヤーの残りHP（回復しない）、報酬で入手・削除したデッキ、役の強化レベル（11.3）、ポイントの設定（6.1。カードに使うポイントの初期値・最大値・回復量）</li>
+        <li><b>引き継ぐもの</b>：プレイヤーの残りHP（回復しない）、報酬で入手・削除したデッキ、役の強化レベル（11.3）、ポイントの設定（6.1。カードに使うポイントの初期値・最大値・回復量）、ルール（3.5）</li>
         <li><b>リセットするもの</b>：山札（その時点のデッキから作り直してシャッフル）・ポイント・シールド・ターン数・敵（HP・行動パターンの位置・溜め込み・ブロック）・攻撃の対象</li>
         <li>敵は毎戦同じ（2体・HP・行動パターンとも変わらない）</li>
       </ul>
@@ -459,6 +471,7 @@ target.hp    -= dealt</code></pre>
       <h2>12. 状態</h2>
       <pre><code>type GameState = {
   battle: number;               // 連戦の何戦目か（1始まり）
+  ruleset: "standard" | "dice_color"; // 構築画面で選んだルール（3.5）
   pointRules: { startPoint: number; maxPoint: number; recovery: number; fullRefill: boolean };
   roleLevels: { [roleId: string]: number }; // 役の強化レベル（連戦中に引き継ぐ）
   turn: number;
@@ -514,6 +527,7 @@ target.hp    -= dealt</code></pre>
     abilityLogic.js   能力の解決
     enemyLogic.js     敵の行動予告・行動パターンの進行・敵の与ダメージ
     pointRules.js     ポイントの設定（範囲の正規化・プリセット・回復）
+    rulesets.js       遊び比べるルールの一覧と選択
     rewardLogic.js    報酬の候補（カード・役）と、入手・削除・強化の確定
 
 docs/                 このページ

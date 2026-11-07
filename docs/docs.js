@@ -15,6 +15,7 @@ import {
 } from "../src/data/cards.js";
 import { BONUS_ROLES, PENALTY_ROLES, ROLE_FAMILIES } from "../src/data/roles.js";
 import { summarizeDeck, bucketLimit } from "../src/game/deckBuilder.js";
+import { DEFAULT_RULESET_ID, RULESETS } from "../src/game/rulesets.js";
 import {
   TACTICAL_ABILITIES,
   isAreaAttackCard,
@@ -285,6 +286,17 @@ table(
     `${TACTICAL_ABILITIES[type]?.targetCount ?? 1}`,
     cards.map((card) => tacticalText(card.tacticalAbility)).join("<br />"),
     cards.map((card) => `${card.name}（Cost ${card.cost}）`).join("<br />"),
+  ]),
+);
+
+// ---- 3.5 ルールの選択 ----
+table(
+  document.querySelector("#ruleset-table"),
+  ["ルール", "内容", "既定"],
+  RULESETS.map((ruleset) => [
+    `<b>${ruleset.label}</b><br /><small><code>${ruleset.id}</code></small>`,
+    ruleset.description,
+    ruleset.id === DEFAULT_RULESET_ID ? "○" : "",
   ]),
 );
 

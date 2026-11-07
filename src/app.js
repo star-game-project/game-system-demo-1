@@ -42,6 +42,12 @@ import {
   pointRulesLabel,
 } from "./game/pointRules.js";
 import {
+  DEFAULT_RULESET_ID,
+  RULESETS,
+  RULESET_BY_ID,
+  normalizeRulesetId,
+} from "./game/rulesets.js";
+import {
   applyReward,
   applyRoleUpgrade,
   canRemoveFromRun,
@@ -59,6 +65,8 @@ let deckCounts = { ...createEmptyCounts(), ...DEFAULT_DECK_COUNTS };
 let engine = null;
 // 構築画面で選ぶポイント設定。連戦中も引き継ぐ。
 let pointRules = { ...DEFAULT_POINT_RULES };
+// 構築画面で選ぶルール（現行ルールか、検討中の新しいルールか）。連戦中も引き継ぐ。
+let ruleset = DEFAULT_RULESET_ID;
 // 戦術カードの対象選択中だけ保持する UI 状態。
 let pendingTactical = null;
 // 連戦中のデッキ（カードごとの枚数）。構築画面のデッキから始まり、報酬で入手・削除して育つ。
@@ -83,6 +91,7 @@ function startBattle(carry = {}) {
   engine = new BattleEngine(
     createInitialGameState(Math.random, createDeckFromCounts(runCounts), {
       pointRules,
+      ruleset,
       roleLevels: runRoleLevels,
       ...carry,
     }),
@@ -667,6 +676,23 @@ function createRoleDialog() {
   return dialog;
 }
 
+function renderRulesetPicker() {
+  const options = RULESETS.map(
+    (option) => `
+      <button class="ruleset-option ${option.id === ruleset ? "is-active" : ""}" data-ruleset="${option.id}" aria-pressed="${option.id === ruleset}">
+        <strong>${option.label}</strong>
+        <small>${option.description}</small>
+      </button>
+    `,
+  ).join("");
+  return `
+    <section class="ruleset-picker">
+      <div><span class="eyebrow">RULES</span><strong>どちらのルールで遊ぶか</strong></div>
+      <div class="ruleset-picker__options">${options}</div>
+    </section>
+  `;
+}
+
 function renderPointRules() {
   const input = (key, label) => `
     <label class="point-rules__field">
@@ -844,6 +870,7 @@ function renderDeckBuild() {
         </dl>
       </section>
 
+      ${renderRulesetPicker()}
       ${renderPointRules()}
 
       ${
@@ -900,7 +927,7 @@ function render() {
           <span class="brand__mark"><i>D<small>6</small></i></span>
           <span><strong>DICE HAND</strong><small>TACTICAL CARD BATTLE</small></span>
         </a>
-        <div class="topbar__center"><span>BATTLE</span><strong>#${String(state.battle).padStart(3, "0")}</strong><span>DECK ${countCards(runCounts)}</span></div>
+        <div class="topbar__center"><span>BATTLE</span><strong>#${String(state.battle).padStart(3, "0")}</strong><span>DECK ${countCards(runCounts)}</span><span class="ruleset-chip ruleset-chip--${state.ruleset}">${RULESET_BY_ID[state.ruleset].label}</span></div>
         <div class="topbar__actions">
           <button class="icon-button" data-action="show-roles" aria-label="役一覧" title="役一覧">役</button>
           <button class="icon-button" data-action="edit-deck" aria-label="デッキを編集" title="デッキを編集">☰</button>
@@ -1019,6 +1046,13 @@ function bindEvents() {
       const key = input.dataset.pointRule;
       const value = input.type === "checkbox" ? input.checked : input.value;
       pointRules = normalizePointRules({ ...pointRules, [key]: value });
+      render();
+    });
+  });
+
+  app.querySelectorAll("[data-ruleset]").forEach((button) => {
+    button.addEventListener("click", () => {
+      ruleset = normalizeRulesetId(button.dataset.ruleset);
       render();
     });
   });

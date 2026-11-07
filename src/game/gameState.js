@@ -4,6 +4,7 @@ import { createEnemies } from "../data/enemies.js";
 import { drawCards, shuffleDeck } from "./deckLogic.js";
 import { evaluateHandRole } from "./roleLogic.js";
 import { DEFAULT_POINT_RULES, normalizePointRules } from "./pointRules.js";
+import { DEFAULT_RULESET_ID, normalizeRulesetId } from "./rulesets.js";
 
 /** 1ターン中に使ったカードの合計。ターン開始時に作り直す。 */
 export function createTurnTotals() {
@@ -13,7 +14,7 @@ export function createTurnTotals() {
 /**
  * 戦闘の初期状態。連戦では battle（何戦目か）と playerHp（前の戦闘の残りHP）を引き継ぐ。
  * それ以外（山札・ポイント・CPU）は毎戦リセットする。pointRules は構築画面で選んだポイント設定、
- * roleLevels は報酬で強化した役のレベル。
+ * roleLevels は報酬で強化した役のレベル、ruleset は構築画面で選んだルール（rulesets.js）。
  */
 export function createInitialGameState(
   random = Math.random,
@@ -23,6 +24,7 @@ export function createInitialGameState(
     playerHp = GAME_CONFIG.PLAYER_MAX_HP,
     pointRules = DEFAULT_POINT_RULES,
     roleLevels = {},
+    ruleset = DEFAULT_RULESET_ID,
   } = {},
 ) {
   const rules = normalizePointRules(pointRules);
@@ -31,6 +33,7 @@ export function createInitialGameState(
 
   return {
     battle,
+    ruleset: normalizeRulesetId(ruleset),
     pointRules: rules,
     // 役の強化レベル（{ 役id: レベル }）。連戦中に報酬で上がる。
     roleLevels: { ...roleLevels },

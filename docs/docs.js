@@ -312,6 +312,7 @@ table(
 );
 for (const [id, value] of [
   ["#item-max-held", ITEM_RULES.MAX_HELD],
+  ["#start-item-max", ITEM_RULES.MAX_HELD],
   ["#item-offer-count", ITEM_RULES.OFFER_COUNT],
   ["#item-gain-count", ITEM_RULES.MAX_GAINS],
 ]) {

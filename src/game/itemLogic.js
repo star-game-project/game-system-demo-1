@@ -35,3 +35,22 @@ export function applyItemReward(items, offers, itemKey = null) {
   if (!canGainItem(items)) return [...items];
   return [...items, itemKey];
 }
+
+/** 構築画面で選ぶ持ち込みアイテム（{ id: 個数 }）の合計。 */
+export function countStartItems(counts) {
+  return Object.values(counts).reduce((sum, count) => sum + Math.max(0, count), 0);
+}
+
+export function canAddStartItem(counts, id) {
+  return Boolean(ITEM_BY_ID[id]) && countStartItems(counts) < ITEM_RULES.MAX_HELD;
+}
+
+/**
+ * 持ち込みアイテムを、連戦の最初に持つ所持の配列にする。
+ * 並びはアイテム一覧の順。持てる数を超える分は持たない。
+ */
+export function itemsFromCounts(counts) {
+  return ITEMS.flatMap((item) =>
+    Array.from({ length: Math.max(0, counts[item.id] ?? 0) }, () => item.id),
+  ).slice(0, ITEM_RULES.MAX_HELD);
+}

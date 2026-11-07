@@ -4,7 +4,14 @@ import { PHASES } from "../src/data/constants.js";
 import { ITEMS, ITEM_RULES } from "../src/data/items.js";
 import { BattleEngine } from "../src/game/battleEngine.js";
 import { createInitialGameState } from "../src/game/gameState.js";
-import { applyItemReward, canGainItem, drawItemOffers } from "../src/game/itemLogic.js";
+import {
+  applyItemReward,
+  canAddStartItem,
+  canGainItem,
+  countStartItems,
+  drawItemOffers,
+  itemsFromCounts,
+} from "../src/game/itemLogic.js";
 
 function engineWithItems(items, { hp = 50, phase = PHASES.CARD_SELECT } = {}) {
   const state = createInitialGameState(() => 0.5, null, { items });
@@ -147,4 +154,24 @@ test("the lock can be used only once a turn, and never on a role worth nothing",
   none.state.currentRole = none.evaluateRole();
   assert.equal(none.state.currentRole.multiplier, 1);
   assert.equal(none.canUseItemAt(0), false);
+});
+
+// ---- 持ち込みアイテム（構築画面） ----
+
+test("starting items become the opening bag, in item-list order", () => {
+  assert.deepEqual(itemsFromCounts({}), []);
+  assert.deepEqual(
+    itemsFromCounts({ role_lock: 1, heal_potion: 2 }),
+    ["heal_potion", "heal_potion", "role_lock"],
+  );
+});
+
+test("no more starting items can be picked than the bag holds", () => {
+  const full = { heal_potion: ITEM_RULES.MAX_HELD };
+  assert.equal(countStartItems(full), ITEM_RULES.MAX_HELD);
+  assert.equal(canAddStartItem(full, "role_lock"), false);
+  assert.equal(canAddStartItem({ heal_potion: 1 }, "role_lock"), true);
+  assert.equal(canAddStartItem({}, "no_such_item"), false);
+  // 上限を超えた指定が来ても、持つのは上限まで。
+  assert.equal(itemsFromCounts({ heal_potion: 9 }).length, ITEM_RULES.MAX_HELD);
 });

@@ -48,8 +48,15 @@ import {
   normalizeRulesetId,
 } from "./game/rulesets.js";
 import { DICE_COLOR_BY_ID } from "./data/diceColors.js";
-import { ITEM_BY_ID, ITEM_RULES } from "./data/items.js";
-import { applyItemReward, canGainItem, drawItemOffers } from "./game/itemLogic.js";
+import { ITEMS, ITEM_BY_ID, ITEM_RULES } from "./data/items.js";
+import {
+  applyItemReward,
+  canAddStartItem,
+  canGainItem,
+  countStartItems,
+  drawItemOffers,
+  itemsFromCounts,
+} from "./game/itemLogic.js";
 import { applyRewardColors, rollDiceColor, rollRunColors } from "./game/colorLogic.js";
 import {
   applyReward,
@@ -79,8 +86,11 @@ let runCounts = null;
 let runRoleLevels = {};
 // 連戦中のデッキの色（{ cardKey: [1枚目の色, …] }）。「ダイスの色（試作）」のときだけ持ち、現行ルールでは null。
 let runColors = null;
-// 連戦中に持っているアイテム（id の配列）。戦闘中に使うと減り、報酬で増える。1戦目からやり直すと空に戻る。
+// 連戦中に持っているアイテム（id の配列）。戦闘中に使うと減り、報酬で増える。
+// 1戦目からやり直すと、構築画面で選んだ持ち込みアイテムに戻る。
 let runItems = [];
+// 構築画面で選ぶ持ち込みアイテム（{ アイテムid: 個数 }）。連戦の最初に持つ。
+let startItemCounts = {};
 // 報酬画面の状態：{ offers, gainKey, removeKey, roleOffers, roleKey, itemOffers, itemKey, battle, playerHp }
 let reward = null;
 
@@ -88,7 +98,7 @@ let reward = null;
 function startRun() {
   runCounts = { ...deckCounts };
   runRoleLevels = {};
-  runItems = [];
+  runItems = itemsFromCounts(startItemCounts);
   // 色は連戦を始めるときに1枚ずつ決め、連戦中は変わらない。
   runColors = ruleset === "dice_color" ? rollRunColors(runCounts) : null;
   startBattle();
@@ -729,6 +739,29 @@ function createRoleDialog() {
   return dialog;
 }
 
+function renderStartItems() {
+  const held = countStartItems(startItemCounts);
+  const rows = ITEMS.map((item) => {
+    const count = startItemCounts[item.id] ?? 0;
+    return `
+      <div class="start-item">
+        <div><strong>${item.name}</strong><small>${item.description}</small></div>
+        <div class="catalogue-card__stepper">
+          <button type="button" data-start-item-remove="${item.id}" ${count ? "" : "disabled"} aria-label="${item.name} を1つ減らす">−</button>
+          <b>${count}</b>
+          <button type="button" data-start-item-add="${item.id}" ${canAddStartItem(startItemCounts, item.id) ? "" : "disabled"} aria-label="${item.name} を1つ増やす">+</button>
+        </div>
+      </div>
+    `;
+  }).join("");
+  return `
+    <section class="ruleset-picker">
+      <div><span class="eyebrow">STARTING ITEMS</span><strong>持ち込むアイテム ${held} / ${ITEM_RULES.MAX_HELD}</strong><small>連戦の最初に持つアイテム。戦闘後の報酬でも手に入る。</small></div>
+      <div class="start-items">${rows}</div>
+    </section>
+  `;
+}
+
 function renderRulesetPicker() {
   const options = RULESETS.map(
     (option) => `
@@ -968,6 +1001,7 @@ function renderDeckBuild() {
 
       ${renderRulesetPicker()}
       ${renderPointRules()}
+      ${renderStartItems()}
 
       ${
         errors.length
@@ -1171,6 +1205,24 @@ function bindEvents() {
         reward.removeKey = null;
         reward.removeIndex = null;
       }
+      render();
+    });
+  });
+
+  app.querySelectorAll("[data-start-item-add]").forEach((button) => {
+    button.addEventListener("click", () => {
+      const id = button.dataset.startItemAdd;
+      if (!canAddStartItem(startItemCounts, id)) return;
+      startItemCounts = { ...startItemCounts, [id]: (startItemCounts[id] ?? 0) + 1 };
+      render();
+    });
+  });
+
+  app.querySelectorAll("[data-start-item-remove]").forEach((button) => {
+    button.addEventListener("click", () => {
+      const id = button.dataset.startItemRemove;
+      if (!(startItemCounts[id] > 0)) return;
+      startItemCounts = { ...startItemCounts, [id]: startItemCounts[id] - 1 };
       render();
     });
   });

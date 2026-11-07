@@ -138,6 +138,9 @@
       <pre><code>// 連戦中の色の持ち方。i 番目の色が、そのカードの i 枚目（id は `${key}_${i + 1}`）の色
 runColors = { pierce_1: ["yellow"], blade_3: ["yellow", "yellow"], … }</code></pre>
       <p>枚数（カードごとの枚数）とは別に持つため、現行ルールのデッキの持ち方は変わらない。色による役は 7.6。</p>
+
+      <h3>3.7 持ち込みアイテム</h3>
+      <p>構築画面の <b>STARTING ITEMS</b> で、連戦の最初に持つアイテム（11.4）を選ぶ。合計は持てる数（<span id="start-item-max"></span>つ）まで。1戦目からやり直すと、ここで選んだアイテムに戻る。既定は持ち込みなし。</p>
     </section>
 
     <section id="cards">
@@ -506,9 +509,9 @@ target.hp    -= dealt</code></pre>
       <div class="docs-table-wrap"><table id="items-table"></table></div>
       <ul>
         <li><b>使い方</b>：自分のターンの、カードを使う段階（DRAW / SKIP を選んだあと）でいつでも使える。<b>ポイントは不要</b>で、ターンも終了しない。使うとなくなる。</li>
-        <li><b>入手</b>：戦闘後の報酬画面で、候補<span id="item-offer-count"></span>つから<span id="item-gain-count"></span>つまで選んで入手する（任意）。</li>
+        <li><b>入手</b>：戦闘後の報酬画面で、候補<span id="item-offer-count"></span>つから<span id="item-gain-count"></span>つまで選んで入手する（任意）。構築画面で持ち込むこともできる（3.7・デモ限定）。</li>
         <li><b>持てる数</b>：<span id="item-max-held"></span>つまで。上限に達しているときは入手できない。同じアイテムを複数持てる。</li>
-        <li>残ったアイテムは次の戦闘に持ち越し、1戦目からやり直すと空に戻る。どちらのルール（3.5）でも同じように使える。</li>
+        <li>残ったアイテムは次の戦闘に持ち越し、1戦目からやり直すと持ち込みアイテム（3.7）に戻る。どちらのルール（3.5）でも同じように使える。</li>
         <li>意味のない使い方はできない（HPが満タンのときの回復、役のない手札での固定など）。</li>
       </ul>
 

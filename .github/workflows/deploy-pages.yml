@@ -19,25 +19,28 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       # ローカル開発と同じ系統に合わせる。依存パッケージはないので install は不要。
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: "26"
 
       - name: Run tests
         run: npm test
 
+      # base_url を得るためビルドより先に実行する。
+      - uses: actions/configure-pages@v6
+        id: pages
+
       - name: Build
         # worker が実行時に行う __SITE_ORIGIN__ の置換を、静的配信ではビルド時に行う。
+        # 独自ドメインを設定した場合もここに反映される。
         env:
-          SITE_ORIGIN: https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}
+          SITE_ORIGIN: ${{ steps.pages.outputs.base_url }}
         run: npm run build
 
-      - uses: actions/configure-pages@v5
-
-      - uses: actions/upload-pages-artifact@v3
+      - uses: actions/upload-pages-artifact@v5
         with:
           path: dist/client
 
@@ -49,4 +52,4 @@ jobs:
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - id: deployment
-        uses: actions/deploy-pages@v4
+        uses: actions/deploy-pages@v5

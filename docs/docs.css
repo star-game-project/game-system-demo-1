@@ -218,3 +218,22 @@
 .docs-callout:target { outline: 2px solid var(--callout); outline-offset: 2px; }
 
 #status-table td:first-child { white-space: nowrap; }
+
+/* ---------- 横スクロールの目印 ---------- */
+
+.docs-shell .docs-scroll-hint {
+  margin: 0 0 4px;
+  text-align: right;
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.docs-table-wrap.is-scrollable {
+  --fade-left: 0px;
+  --fade-right: 0px;
+  -webkit-mask-image: linear-gradient(to right, transparent, #000 var(--fade-left), #000 calc(100% - var(--fade-right)), transparent);
+  mask-image: linear-gradient(to right, transparent, #000 var(--fade-left), #000 calc(100% - var(--fade-right)), transparent);
+}
+
+.docs-table-wrap.has-more-left { --fade-left: 32px; }
+.docs-table-wrap.has-more-right { --fade-right: 32px; }

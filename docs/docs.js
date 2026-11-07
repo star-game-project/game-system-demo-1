@@ -328,6 +328,32 @@ table(
   ),
 );
 
+// ---- 横にスクロールできる表の目印 ----
+// スマホでは表が画面幅に収まらず横スクロールになるが、そのままでは気づきにくい。
+// はみ出している表にだけ案内を出し、続きがある側の端をぼかす。
+const tableWraps = [...document.querySelectorAll(".docs-table-wrap")];
+tableWraps.forEach((wrap) => {
+  const hint = document.createElement("p");
+  hint.className = "docs-scroll-hint";
+  hint.textContent = "表は横にスクロールできます →";
+  hint.hidden = true;
+  wrap.before(hint);
+  wrap.addEventListener("scroll", () => updateScrollCue(wrap), { passive: true });
+});
+
+function updateScrollCue(wrap) {
+  const overflow = wrap.scrollWidth - wrap.clientWidth;
+  const scrollable = overflow > 1;
+  wrap.classList.toggle("is-scrollable", scrollable);
+  wrap.classList.toggle("has-more-left", scrollable && wrap.scrollLeft > 1);
+  wrap.classList.toggle("has-more-right", scrollable && wrap.scrollLeft < overflow - 1);
+  wrap.previousElementSibling.hidden = !scrollable;
+}
+
+const updateAllScrollCues = () => tableWraps.forEach(updateScrollCue);
+window.addEventListener("resize", updateAllScrollCues);
+updateAllScrollCues();
+
 // ---- 目次 ----
 const toc = document.querySelector("#toc");
 if (toc) {

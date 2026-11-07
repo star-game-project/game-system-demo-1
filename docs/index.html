@@ -249,7 +249,7 @@ runColors = { pierce_1: ["yellow"], blade_3: ["yellow", "yellow"], … }</code><
 absorbed = Math.min(shield, incoming)
 taken    = incoming - absorbed
 hp      -= taken</code></pre>
-      <p>1ターンに複数枚使う場合、2枚目以降は<b>1枚減った手札で役を判定し直す</b>ため、使うほど役が崩れる可能性がある。すべての敵のHPが0になった時点で、ターンの途中でも即座に勝利となる。</p>
+      <p>1ターンに複数枚使う場合、2枚目以降は<b>1枚減った手札で役を判定し直す</b>ため、使うほど役が崩れる可能性がある（アイテム Role Lock を使ったターンは、役が固定されて崩れない。11.4）。すべての敵のHPが0になった時点で、ターンの途中でも即座に勝利となる。</p>
 
       <h3>6.5 手札の総入れ替え</h3>
       <p>ターン終了時に<b>手札をすべて捨て札へ送り、あらためて5枚引き直す</b>。引き直しはポイントを消費しない。</p>
@@ -509,8 +509,19 @@ target.hp    -= dealt</code></pre>
         <li><b>入手</b>：戦闘後の報酬画面で、候補<span id="item-offer-count"></span>つから<span id="item-gain-count"></span>つまで選んで入手する（任意）。</li>
         <li><b>持てる数</b>：<span id="item-max-held"></span>つまで。上限に達しているときは入手できない。同じアイテムを複数持てる。</li>
         <li>残ったアイテムは次の戦闘に持ち越し、1戦目からやり直すと空に戻る。どちらのルール（3.5）でも同じように使える。</li>
-        <li>意味のない使い方はできない（HPが満タンのときの回復など）。</li>
+        <li>意味のない使い方はできない（HPが満タンのときの回復、役のない手札での固定など）。</li>
       </ul>
+
+      <h4>Role Lock（役の固定）</h4>
+      <p>使った時点の役（倍率と役の組み合わせ）を、<b>そのターンの終わりまで固定</b>する。通常はカードを1枚使うたびに残りの手札で役を判定し直すため、使うほど役が崩れていく（6.4）。固定しているあいだは判定し直さず、何枚使っても、戦術カードで目を変えても、固定した倍率で攻撃する。</p>
+      <ul>
+        <li>1ターンに1回まで。倍率が1以下（役なし・減算役）のときは使えない。</li>
+        <li>ターン終了時に解除し、次のターンは新しい手札で判定する。</li>
+        <li>固定中は、戦闘画面に <code>ROLE LOCK ×1.49（このターン）</code> と表示し、手札の役に「固定中」と付ける。</li>
+      </ul>
+      <pre><code>4, 4, 1, 6 （PAIR ×1.1）で Role Lock
+  → 4 を1枚使って手札が 4, 1, 6 になっても ×1.1 のまま
+  → 次の攻撃も ×1.1</code></pre>
       <aside class="docs-callout docs-callout--open" data-summary="HPの回復手段の役割分担（アイテム・回復スポット・HP回復カード）">
         <span class="docs-tag docs-tag--open">検討中</span>
         <p>HPを回復する手段として、アイテム（Heal Potion）、戦闘以外の局面の回復スポット（1.1）、先送りにしている HP回復カードがある。どれをどう使い分けるかは未定。</p>
@@ -549,6 +560,7 @@ target.hp    -= dealt</code></pre>
 
   selectedCardId: string | null;
   currentRole: HandRoleResult | null;
+  lockedRole: HandRoleResult | null; // Role Lock で固定した役。固定したターンだけ持つ（11.4）
   lastAttack: AttackResult | null;
   battleMessage: string;
 };</code></pre>

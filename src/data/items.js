@@ -10,6 +10,12 @@ export const ITEMS = Object.freeze([
     effect: Object.freeze({ type: "HEAL", value: 20 }),
     description: "HPを20回復する（最大HPを超えない）",
   }),
+  Object.freeze({
+    id: "role_lock",
+    name: "Role Lock",
+    effect: Object.freeze({ type: "LOCK_ROLE" }),
+    description: "いまの役の倍率を、このターンの終わりまで固定する（カードを使っても崩れない）",
+  }),
 ]);
 
 export const ITEM_BY_ID = Object.freeze(

@@ -1901,3 +1901,9 @@ a:focus-visible {
 .item-slot small { font-size: 10px; color: var(--muted); }
 .item-slot:not(:disabled):hover { border-color: var(--lime); }
 .item-slot:disabled { opacity: 0.45; cursor: default; }
+
+.buff-chip--lock {
+  color: var(--lime);
+  border-color: color-mix(in srgb, var(--lime) 45%, transparent);
+  background: color-mix(in srgb, var(--lime) 10%, transparent);
+}

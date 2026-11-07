@@ -435,6 +435,7 @@ function renderPoints(state) {
         <span><i class="deck-icon"></i>DECK <b>${state.player.deck.length}</b></span>
         <span><i class="discard-icon"></i>DISCARD <b>${state.player.discardPile.length}</b></span>
         ${state.player.shield ? `<span class="buff-chip buff-chip--shield">SHIELD ${state.player.shield}</span>` : ""}
+        ${state.lockedRole ? `<span class="buff-chip buff-chip--lock">ROLE LOCK ${multiplierLabel(state.lockedRole.multiplier)}（このターン）</span>` : ""}
         ${activeBonus ? `<span class="buff-chip">ATK +${activeBonus} ACTIVE</span>` : ""}
         ${pendingBonus ? `<span class="buff-chip buff-chip--pending">NEXT ATK +${pendingBonus}</span>` : ""}
       </div>
@@ -1046,7 +1047,7 @@ function render() {
       <section class="hand-section">
         <div class="hand-heading">
           <div><span class="eyebrow">YOUR ARSENAL</span><h2>HAND <b>${state.player.hand.length}</b></h2></div>
-          <div class="hand-role"><span>CURRENT ROLE</span><strong>${roleNameLabel(state.currentRole) || "NONE"}</strong><b>${multiplierLabel(state.currentRole?.multiplier ?? 1)}</b></div>
+          <div class="hand-role"><span>CURRENT ROLE${state.lockedRole ? "（固定中）" : ""}</span><strong>${roleNameLabel(state.currentRole) || "NONE"}</strong><b>${multiplierLabel(state.currentRole?.multiplier ?? 1)}</b></div>
         </div>
         <div class="hand-track">${renderHand(state)}</div>
       </section>

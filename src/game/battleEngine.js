@@ -24,6 +24,11 @@ export class BattleEngine {
     this.random = random;
   }
 
+  /** いまの手札の役。Role Lock で固定しているターンは、手札に関係なく固定した役を返す。 */
+  evaluateRole(hand = this.state.player.hand) {
+    return this.state.lockedRole ?? evaluateHandRole(hand, this.state.roleLevels, this.state.ruleset);
+  }
+
   /** 山札から引く。山札が尽きたら捨て札をシャッフルして再構築する。 */
   drawIntoHand(amount) {
     const { player } = this.state;
@@ -73,7 +78,7 @@ export class BattleEngine {
       this.state.battleMessage = "ドローをスキップしました。";
     }
 
-    this.state.currentRole = evaluateHandRole(player.hand, this.state.roleLevels, this.state.ruleset);
+    this.state.currentRole = this.evaluateRole(player.hand);
     this.state.phase = PHASES.CARD_SELECT;
     return true;
   }
@@ -106,6 +111,7 @@ export class BattleEngine {
       this.state.turn,
       this.state.roleLevels,
       this.state.ruleset,
+      this.state.lockedRole,
     );
     return { ...attack, ...this.resolveHits(card, attack.finalAttack, false) };
   }
@@ -198,7 +204,7 @@ export class BattleEngine {
     if (!player.hand.some((item) => item.id === this.state.selectedCardId)) {
       this.state.selectedCardId = null;
     }
-    this.state.currentRole = evaluateHandRole(player.hand, this.state.roleLevels, this.state.ruleset);
+    this.state.currentRole = this.evaluateRole(player.hand);
     this.state.battleMessage = message;
     return { card, targets, role: this.state.currentRole };
   }
@@ -259,6 +265,7 @@ export class BattleEngine {
       this.state.turn,
       this.state.roleLevels,
       this.state.ruleset,
+      this.state.lockedRole,
     );
 
     const { hits, blocked, dealt } = this.resolveHits(card, attack.finalAttack);
@@ -276,7 +283,7 @@ export class BattleEngine {
     this.state.player.hand = this.state.player.hand.filter((item) => item.id !== card.id);
     this.state.player.discardPile.push(card);
     this.state.player.cardsPlayed += 1;
-    this.state.currentRole = evaluateHandRole(this.state.player.hand, this.state.roleLevels, this.state.ruleset);
+    this.state.currentRole = this.evaluateRole();
     this.state.lastAttack = { ...attack, cardName: card.name };
     this.state.lastDefense = null;
     this.state.turnTotals.cards += 1;
@@ -310,7 +317,7 @@ export class BattleEngine {
     player.hand = player.hand.filter((item) => item.id !== card.id);
     player.discardPile.push(card);
     player.cardsPlayed += 1;
-    this.state.currentRole = evaluateHandRole(player.hand, this.state.roleLevels, this.state.ruleset);
+    this.state.currentRole = this.evaluateRole(player.hand);
     this.state.lastAttack = null;
     this.state.lastDefense = defense;
     this.state.turnTotals.cards += 1;
@@ -385,8 +392,9 @@ export class BattleEngine {
       this.state.turn,
     );
 
-    // シールドはターンをまたがない。
+    // シールドと役の固定はターンをまたがない。
     this.state.player.shield = 0;
+    this.state.lockedRole = null;
     this.state.turnTotals = createTurnTotals();
 
     // 手札はターン終了時にすべて捨て札へ送り、新しい手札を引き直す。
@@ -394,7 +402,7 @@ export class BattleEngine {
     const refill = this.drawIntoHand(GAME_CONFIG.START_HAND_SIZE);
 
     this.state.selectedCardId = null;
-    this.state.currentRole = evaluateHandRole(this.state.player.hand, this.state.roleLevels, this.state.ruleset);
+    this.state.currentRole = this.evaluateRole();
     this.state.phase = PHASES.DRAW_SELECT;
     const recycleNote = refill.recycleCount
       ? "捨て札をシャッフルして山札を再構築。"
@@ -407,6 +415,10 @@ export class BattleEngine {
   canUseItemAt(slot) {
     if (this.state.phase !== PHASES.CARD_SELECT) return false;
     const item = ITEM_BY_ID[this.state.player.items[slot]];
+    if (item?.effect.type === "LOCK_ROLE") {
+      // 固定は1ターンに1回。倍率が1以下（役なし・減算）を固定しても意味がない。
+      return !this.state.lockedRole && this.state.currentRole.multiplier > 1;
+    }
     return canUseItem(item, this.state.player);
   }
 
@@ -423,6 +435,10 @@ export class BattleEngine {
     if (item.effect.type === "HEAL") {
       const healed = healPlayer(player, item.effect.value);
       this.state.battleMessage = `${item.name} — HPを${healed}回復しました（${player.hp} / ${player.maxHp}）。`;
+    }
+    if (item.effect.type === "LOCK_ROLE") {
+      this.state.lockedRole = this.state.currentRole;
+      this.state.battleMessage = `${item.name} — このターンの終わりまで、役の倍率を ×${this.state.currentRole.multiplier} に固定しました。`;
     }
     return { item };
   }

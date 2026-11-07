@@ -72,3 +72,79 @@ test("a reward adds the chosen item, but never past the carrying limit", () => {
   assert.equal(canGainItem(full), false);
   assert.deepEqual(applyItemReward(full, ["heal_potion"], "heal_potion"), full);
 });
+
+// ---- Role Lock ----
+
+const card = (id, dieValue, overrides = {}) => ({
+  id,
+  name: id,
+  cost: 1,
+  attack: 10,
+  dieValue,
+  baseDieValue: dieValue,
+  onUseAbility: null,
+  passiveAbility: null,
+  tacticalAbility: null,
+  ...overrides,
+});
+
+/** 4,4 のペアがある手札。片方の4を使うとペアが崩れる。 */
+function lockEngine(items = ["role_lock"]) {
+  const state = createInitialGameState(() => 0.5, null, { items });
+  state.phase = PHASES.CARD_SELECT;
+  state.player.hand = [card("four_a", 4), card("four_b", 4), card("one", 1), card("six", 6)];
+  const engine = new BattleEngine(state, () => 0.5);
+  state.currentRole = engine.evaluateRole();
+  return engine;
+}
+
+test("the role lock holds the multiplier even after the pair is broken", () => {
+  const engine = lockEngine();
+  assert.equal(engine.state.currentRole.roleId, "pair");
+  const locked = engine.state.currentRole.multiplier;
+
+  assert.ok(engine.useItem(0));
+  engine.selectCard("four_a");
+  engine.useSelectedCard();
+
+  // 手札の4は1枚だけになったが、役は固定したまま。
+  assert.equal(engine.state.player.hand.filter((c) => c.dieValue === 4).length, 1);
+  assert.equal(engine.state.currentRole.multiplier, locked);
+  assert.deepEqual(engine.state.player.items, []);
+});
+
+test("attacks under the lock use the locked multiplier", () => {
+  const engine = lockEngine();
+  const locked = engine.state.currentRole.multiplier;
+  engine.useItem(0);
+  engine.selectCard("four_a");
+  engine.useSelectedCard();
+
+  // 2枚目：手札だけ見れば役なし（×1）だが、固定した倍率が掛かる。
+  const preview = engine.getAttackPreview("six");
+  assert.equal(preview.roleMultiplier, locked);
+  assert.equal(preview.finalAttack, Math.round(10 * locked));
+});
+
+test("the lock is released when the turn ends", () => {
+  const engine = lockEngine();
+  engine.useItem(0);
+  engine.endTurn();
+  engine.startCpuTurn();
+  engine.finishTurn();
+  assert.equal(engine.state.lockedRole, null);
+});
+
+test("the lock can be used only once a turn, and never on a role worth nothing", () => {
+  const twice = lockEngine(["role_lock", "role_lock"]);
+  assert.ok(twice.useItem(0));
+  assert.equal(twice.canUseItemAt(0), false);
+  assert.equal(twice.useItem(0), null);
+
+  // 役なし（×1）の手札では固定できない。
+  const none = lockEngine();
+  none.state.player.hand = [card("one", 1), card("four", 4)];
+  none.state.currentRole = none.evaluateRole();
+  assert.equal(none.state.currentRole.multiplier, 1);
+  assert.equal(none.canUseItemAt(0), false);
+});

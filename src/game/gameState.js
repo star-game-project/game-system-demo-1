@@ -59,6 +59,8 @@ export function createInitialGameState(
     targetId: "enemy_1",
     selectedCardId: null,
     currentRole: evaluateHandRole(openingDraw.drawn, roleLevels, normalizeRulesetId(ruleset)),
+    // Role Lock で固定した役。固定しているターンだけ持ち、ターン終了で null に戻す。
+    lockedRole: null,
     lastAttack: null,
     lastDefense: null,
     // 直前の敵ターンで各敵が行った行動。

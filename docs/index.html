@@ -470,9 +470,13 @@ target.hp    -= dealt</code></pre>
         <li><b>削除</b>：今のデッキから<b>1枚まで</b>削除する。入手分を含めたデッキが最小枚数（6枚）を下回る削除はできない。</li>
         <li>構築画面の制約（目の上限・同名の上限・最大20枚）は、連戦中のデッキには掛けない。</li>
       </ul>
-      <aside class="docs-callout docs-callout--plan" data-summary="戦闘後の報酬はカードの入手だけにし、役の強化とカードの削除は別の場面で用意する">
+      <aside class="docs-callout docs-callout--plan" data-summary="役の強化とカードの削除は、ショップなど別の場面で用意する">
         <span class="docs-tag docs-tag--plan">変更予定</span>
-        <p>本番では、<b>戦闘後の報酬はカードの入手だけ</b>にする。役の強化（11.3）とカードの削除は、ショップなど別の場面で用意する（1.1）。強化の手段・条件も今後増やしていく。</p>
+        <p>本番では、役の強化（11.3）とカードの削除を、ショップなど別の場面で用意する（1.1）。強化の手段・条件も今後増やしていく。</p>
+      </aside>
+      <aside class="docs-callout docs-callout--open" data-summary="戦闘後の報酬に何を並べるか（カードに加えてアイテムも検討。「カードの入手だけ」は取り下げ）">
+        <span class="docs-tag docs-tag--open">検討中</span>
+        <p>「戦闘後の報酬はカードの入手だけにする」という方針は取り下げた。カードに加えて<b>アイテム</b>も並べる案を検討している（確定ではない）。</p>
       </aside>
       <p>報酬画面には残りHP、今のデッキの全カードと枚数、確定後のデッキ枚数、現在の役のレベルを表示する。ロジックは <code>src/game/rewardLogic.js</code>、枚数は <code>REWARD_RULES</code> で管理する。</p>
 

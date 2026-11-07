@@ -134,9 +134,64 @@ export const HAND_ROLES = Object.freeze([
   },
 ]);
 
+/**
+ * 色の役。ルール「ダイスの色（試作）」でだけ判定する（rolesFor）。
+ * 同じ色の枚数で段階を付け、目の役とは系統（color）をまたいで掛け合わせる。
+ * 倍率は、色が一様に付いた手札5枚での成立しやすさを目の役の並びに当てはめた仮の値：
+ *   THREE FLUSH（同色がちょうど3枚）35.2% → PAIR 並み
+ *   FOUR FLUSH（ちょうど4枚）5.9%       → THREE OF A KIND 並み
+ *   FLUSH（5枚すべて）0.4%               → FULL HOUSE と FOUR OF A KIND の間
+ */
+export const COLOR_ROLES = Object.freeze([
+  {
+    id: "flush",
+    name: "FLUSH",
+    family: "color",
+    multiplier: 2,
+    kind: "bonus",
+    priority: 92,
+    // 手札全体が条件の役。カードを使って手札が減ると成立しやすくなるため、手札5枚を下限にする。
+    minHandSize: 5,
+    ruleset: "dice_color",
+    description: "手札すべてが同じ色（5枚以上）",
+  },
+  {
+    id: "four_flush",
+    name: "FOUR FLUSH",
+    family: "color",
+    multiplier: 1.5,
+    kind: "bonus",
+    priority: 78,
+    ruleset: "dice_color",
+    description: "同じ色が4枚",
+  },
+  {
+    id: "three_flush",
+    name: "THREE FLUSH",
+    family: "color",
+    multiplier: 1.1,
+    kind: "bonus",
+    priority: 35,
+    ruleset: "dice_color",
+    description: "同じ色が3枚",
+  },
+]);
+
 export const ROLE_BY_ID = Object.freeze(
-  Object.fromEntries(HAND_ROLES.map((role) => [role.id, role])),
+  Object.fromEntries([...HAND_ROLES, ...COLOR_ROLES].map((role) => [role.id, role])),
 );
+
+/** そのルールで判定する役。現行ルールは HAND_ROLES だけ、「ダイスの色（試作）」は色の役も加える。 */
+export function rolesFor(ruleset = "standard") {
+  return ruleset === "dice_color" ? [...HAND_ROLES, ...COLOR_ROLES] : HAND_ROLES;
+}
+
+/** そのルールのボーナス役を、倍率の高い順（同じなら priority の高い順）に並べたもの。 */
+export function bonusRolesFor(ruleset = "standard") {
+  return rolesFor(ruleset)
+    .filter((role) => role.kind === "bonus")
+    .sort((a, b) => b.multiplier - a.multiplier || b.priority - a.priority);
+}
 
 export const PENALTY_ROLES = Object.freeze(
   HAND_ROLES.filter((role) => role.kind === "penalty"),

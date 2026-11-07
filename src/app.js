@@ -12,7 +12,7 @@ import {
   DEFAULT_DECK_COUNTS,
   createDeckFromCounts,
 } from "./data/cards.js";
-import { BONUS_ROLES, PENALTY_ROLES, ROLE_BY_ID, ROLE_GROWTH, upgradedMultiplier } from "./data/roles.js";
+import { PENALTY_ROLES, ROLE_BY_ID, ROLE_GROWTH, bonusRolesFor, upgradedMultiplier } from "./data/roles.js";
 import {
   addCard,
   bucketLimit,
@@ -116,7 +116,7 @@ function openReward() {
     removeKey: null,
     // 色があるときは、同じカードでも色ごとに別の1枚として削除を選ぶ。
     removeIndex: null,
-    roleOffers: drawRoleOffers(),
+    roleOffers: drawRoleOffers(Math.random, REWARD_RULES.ROLE_OFFER_COUNT, state.ruleset),
     roleKey: null,
     battle: state.battle,
     playerHp: state.player.hp,
@@ -653,9 +653,10 @@ function roleMultiplierText(role, levels = {}) {
   return level ? `${current} <small>(${multiplierLabel(role.multiplier)} Lv${level})</small>` : current;
 }
 
-function renderRoleTable(levels = {}) {
+/** rulesetId のルールで判定する役の一覧。「ダイスの色（試作）」なら色の役も並ぶ。 */
+function renderRoleTable(levels = {}, rulesetId = ruleset) {
   // 倍率の高い順に並べ、減算役は最後にまとめる（並びは強化前の倍率）。
-  return [...BONUS_ROLES, ...PENALTY_ROLES].map(
+  return [...bonusRolesFor(rulesetId), ...PENALTY_ROLES].map(
     (role) => `
       <div class="role-table__row ${role.kind === "penalty" ? "role-table__row--risk" : ""}">
         <span>${role.name}</span>
@@ -666,19 +667,21 @@ function renderRoleTable(levels = {}) {
   ).join("");
 }
 
-const ROLE_RULE_HINT =
-  "手札全体の目で役が決まります。系統ごとに最も倍率の高い役を1つ採り、系統をまたいで倍率を掛け合わせます。";
+function roleRuleHint(rulesetId = ruleset) {
+  const basis = rulesetId === "dice_color" ? "手札全体の目と色" : "手札全体の目";
+  return `${basis}で役が決まります。系統ごとに最も倍率の高い役を1つ採り、系統をまたいで倍率を掛け合わせます。`;
+}
 
 /**
  * 戦闘中に役一覧を開くダイアログ。render() は #app を丸ごと書き換えるため、
  * CPUターンの再描画で閉じないよう #app の外に一度だけ作る。
  */
-function renderRoleDialogBody(levels) {
+function renderRoleDialogBody(levels, rulesetId = ruleset) {
   return `
     <form method="dialog" class="role-table">
       <span class="eyebrow">ROLE LIST</span>
-      <p class="role-table__hint">${ROLE_RULE_HINT}</p>
-      ${renderRoleTable(levels)}
+      <p class="role-table__hint">${roleRuleHint(rulesetId)}</p>
+      ${renderRoleTable(levels, rulesetId)}
       <button class="command-button command-button--secondary">CLOSE</button>
     </form>
   `;
@@ -872,7 +875,7 @@ function renderReward() {
 
       <section class="role-table">
         <span class="eyebrow">ROLE LIST（現在のレベル）</span>
-        ${renderRoleTable(runRoleLevels)}
+        ${renderRoleTable(runRoleLevels, engine.state.ruleset)}
       </section>
     </main>
   `;
@@ -932,7 +935,7 @@ function renderDeckBuild() {
 
         <aside class="role-table">
           <span class="eyebrow">ROLE LIST</span>
-          <p class="role-table__hint">${ROLE_RULE_HINT}</p>
+          <p class="role-table__hint">${roleRuleHint()}</p>
           ${renderRoleTable()}
         </aside>
       </div>
@@ -1159,7 +1162,10 @@ function bindEvents() {
 
       if (action === "show-roles") {
         // 強化レベルは連戦中に変わるため、開くたびに作り直す。
-        roleDialog.innerHTML = renderRoleDialogBody(engine?.state.roleLevels ?? runRoleLevels);
+        roleDialog.innerHTML = renderRoleDialogBody(
+          engine?.state.roleLevels ?? runRoleLevels,
+          engine?.state.ruleset ?? ruleset,
+        );
         roleDialog.showModal();
       }
       if (action === "draw" && engine.chooseDraw(true)) render();

@@ -71,7 +71,7 @@ export class BattleEngine {
       this.state.battleMessage = "ドローをスキップしました。";
     }
 
-    this.state.currentRole = evaluateHandRole(player.hand, this.state.roleLevels);
+    this.state.currentRole = evaluateHandRole(player.hand, this.state.roleLevels, this.state.ruleset);
     this.state.phase = PHASES.CARD_SELECT;
     return true;
   }
@@ -103,6 +103,7 @@ export class BattleEngine {
       this.state.player,
       this.state.turn,
       this.state.roleLevels,
+      this.state.ruleset,
     );
     return { ...attack, ...this.resolveHits(card, attack.finalAttack, false) };
   }
@@ -195,7 +196,7 @@ export class BattleEngine {
     if (!player.hand.some((item) => item.id === this.state.selectedCardId)) {
       this.state.selectedCardId = null;
     }
-    this.state.currentRole = evaluateHandRole(player.hand, this.state.roleLevels);
+    this.state.currentRole = evaluateHandRole(player.hand, this.state.roleLevels, this.state.ruleset);
     this.state.battleMessage = message;
     return { card, targets, role: this.state.currentRole };
   }
@@ -255,6 +256,7 @@ export class BattleEngine {
       this.state.player,
       this.state.turn,
       this.state.roleLevels,
+      this.state.ruleset,
     );
 
     const { hits, blocked, dealt } = this.resolveHits(card, attack.finalAttack);
@@ -272,7 +274,7 @@ export class BattleEngine {
     this.state.player.hand = this.state.player.hand.filter((item) => item.id !== card.id);
     this.state.player.discardPile.push(card);
     this.state.player.cardsPlayed += 1;
-    this.state.currentRole = evaluateHandRole(this.state.player.hand, this.state.roleLevels);
+    this.state.currentRole = evaluateHandRole(this.state.player.hand, this.state.roleLevels, this.state.ruleset);
     this.state.lastAttack = { ...attack, cardName: card.name };
     this.state.lastDefense = null;
     this.state.turnTotals.cards += 1;
@@ -306,7 +308,7 @@ export class BattleEngine {
     player.hand = player.hand.filter((item) => item.id !== card.id);
     player.discardPile.push(card);
     player.cardsPlayed += 1;
-    this.state.currentRole = evaluateHandRole(player.hand, this.state.roleLevels);
+    this.state.currentRole = evaluateHandRole(player.hand, this.state.roleLevels, this.state.ruleset);
     this.state.lastAttack = null;
     this.state.lastDefense = defense;
     this.state.turnTotals.cards += 1;
@@ -390,7 +392,7 @@ export class BattleEngine {
     const refill = this.drawIntoHand(GAME_CONFIG.START_HAND_SIZE);
 
     this.state.selectedCardId = null;
-    this.state.currentRole = evaluateHandRole(this.state.player.hand, this.state.roleLevels);
+    this.state.currentRole = evaluateHandRole(this.state.player.hand, this.state.roleLevels, this.state.ruleset);
     this.state.phase = PHASES.DRAW_SELECT;
     const recycleNote = refill.recycleCount
       ? "捨て札をシャッフルして山札を再構築。"

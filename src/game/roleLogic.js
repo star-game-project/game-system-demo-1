@@ -1,4 +1,4 @@
-import { HAND_ROLES, upgradedMultiplier } from "../data/roles.js";
+import { rolesFor, upgradedMultiplier } from "../data/roles.js";
 import { isWildCard, MAX_DIE_VALUE, MIN_DIE_VALUE } from "./abilityLogic.js";
 
 const NO_ROLE = Object.freeze({
@@ -23,9 +23,10 @@ const MAX_WILD_SEARCH = 4;
 /**
  * family ごとに、レベル反映後の倍率が高い順に並べた役。
  * 強化で下位の役が上位を追い越すこともあるため、レベルごとに並べ直す。
+ * ruleset が「ダイスの色（試作）」なら色の役（color 系統）も加わる。
  */
-function familiesFor(levels) {
-  const roles = HAND_ROLES.map((role) => ({ ...role, multiplier: upgradedMultiplier(role, levels) }));
+function familiesFor(levels, ruleset) {
+  const roles = rolesFor(ruleset).map((role) => ({ ...role, multiplier: upgradedMultiplier(role, levels) }));
   return [...new Set(roles.map((role) => role.family))].map((family) =>
     roles
       .filter((role) => role.family === family)
@@ -60,7 +61,7 @@ function longestRun(distinctSorted) {
 
 /** ワイルドを含まない、確定した目の並びに対する成立判定。 */
 function matchesRole(roleId, context) {
-  const { counts, distinct, run, values, handSize } = context;
+  const { counts, distinct, run, values, handSize, colorMax } = context;
   const maxCount = Math.max(0, ...counts.values());
   const pairCount = [...counts.values()].filter((count) => count >= 2).length;
 
@@ -89,6 +90,13 @@ function matchesRole(roleId, context) {
       return pairCount >= 2;
     case "pair":
       return maxCount >= 2;
+    // 色の役。色はワイルドでも普通に1色なので、目の割り当てとは関係なく決まる。
+    case "flush":
+      return colorMax === handSize;
+    case "four_flush":
+      return colorMax >= 4;
+    case "three_flush":
+      return colorMax >= 3;
     case "one_two_three":
       // 4 まで伸ばせば STRAIGHT として脱出できる。
       return (
@@ -99,7 +107,7 @@ function matchesRole(roleId, context) {
   }
 }
 
-function evaluateConcreteHand(values, handSize, families) {
+function evaluateConcreteHand(values, handSize, families, colorMax = 0) {
   const counts = tally(values);
   const distinct = [...counts.keys()].sort((a, b) => a - b);
   const context = {
@@ -108,6 +116,7 @@ function evaluateConcreteHand(values, handSize, families) {
     run: longestRun(distinct),
     values,
     handSize,
+    colorMax,
   };
 
   // family ごとに最も倍率の高い役をひとつ選び、family をまたいで掛け合わせる。
@@ -158,10 +167,20 @@ function wildAssignments(count, start = 0) {
   return results;
 }
 
-/** levels は役の強化レベル（{ 役id: レベル }）。省略時は強化なし。 */
-export function evaluateHandRole(hand, levels = {}) {
+/** 同じ色のカードの最大枚数。色の無いカード（現行ルール）は数えない。 */
+function largestColorGroup(hand) {
+  const colors = hand.map((card) => card.color).filter(Boolean);
+  return Math.max(0, ...tally(colors).values());
+}
+
+/**
+ * levels は役の強化レベル（{ 役id: レベル }）。省略時は強化なし。
+ * ruleset は遊んでいるルール（rulesets.js）。「ダイスの色（試作）」のときだけ色の役を判定する。
+ */
+export function evaluateHandRole(hand, levels = {}, ruleset = "standard") {
   if (!hand.length) return noRole();
-  const families = familiesFor(levels);
+  const families = familiesFor(levels, ruleset);
+  const colorMax = largestColorGroup(hand);
 
   const fixedValues = hand
     .filter((card) => !isWildCard(card))
@@ -169,7 +188,7 @@ export function evaluateHandRole(hand, levels = {}) {
   const wildCount = hand.length - fixedValues.length;
 
   if (wildCount === 0 || wildCount > MAX_WILD_SEARCH) {
-    return evaluateConcreteHand(fixedValues, hand.length, families);
+    return evaluateConcreteHand(fixedValues, hand.length, families, colorMax);
   }
 
   // ワイルドはプレイヤーにとって最も有利になる目として扱う。
@@ -180,6 +199,7 @@ export function evaluateHandRole(hand, levels = {}) {
       [...fixedValues, ...assignment],
       hand.length,
       families,
+      colorMax,
     );
     if (
       !best ||

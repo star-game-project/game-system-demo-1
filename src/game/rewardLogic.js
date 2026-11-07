@@ -1,5 +1,5 @@
 import { CARD_BY_KEY, CARD_CATALOGUE } from "../data/cards.js";
-import { BONUS_ROLES } from "../data/roles.js";
+import { bonusRolesFor } from "../data/roles.js";
 import { DECK_RULES, REWARD_RULES } from "../data/constants.js";
 import { shuffleDeck } from "./deckLogic.js";
 
@@ -34,9 +34,16 @@ export function applyReward(counts, offers, { gainKey = null, removeKey = null }
   return next;
 }
 
-/** 役の強化の候補。ボーナス役から重複なしで等確率に選ぶ（減算役は対象外）。 */
-export function drawRoleOffers(random = Math.random, count = REWARD_RULES.ROLE_OFFER_COUNT) {
-  return shuffleDeck(BONUS_ROLES.map((role) => role.id), random).slice(0, count);
+/**
+ * 役の強化の候補。そのルールのボーナス役から重複なしで等確率に選ぶ（減算役は対象外）。
+ * 「ダイスの色（試作）」では色の役も候補に入る。
+ */
+export function drawRoleOffers(
+  random = Math.random,
+  count = REWARD_RULES.ROLE_OFFER_COUNT,
+  ruleset = "standard",
+) {
+  return shuffleDeck(bonusRolesFor(ruleset).map((role) => role.id), random).slice(0, count);
 }
 
 /** 役の強化を確定する。候補にない役は強化しない。 */

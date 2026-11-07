@@ -34,8 +34,8 @@ test("an unknown rule set falls back to the current rules", () => {
   );
 });
 
-test("choosing the prototype does not change the opening state yet", () => {
-  // 色の役はまだ無いので、同じ乱数なら現行ルールと同じ戦闘が始まる。
+test("choosing the prototype alone, without coloured cards, changes nothing else", () => {
+  // 色は連戦を始めるときに付く。色の無いデッキなら、同じ乱数で現行ルールと同じ戦闘が始まる。
   const standard = createInitialGameState(() => 0.5);
   const prototype = createInitialGameState(() => 0.5, null, { ruleset: "dice_color" });
   const { ruleset: _a, ...restStandard } = standard;

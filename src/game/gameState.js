@@ -55,7 +55,7 @@ export function createInitialGameState(
     // 攻撃の対象。倒れたら生き残っている先頭の敵に移る。
     targetId: "enemy_1",
     selectedCardId: null,
-    currentRole: evaluateHandRole(openingDraw.drawn, roleLevels),
+    currentRole: evaluateHandRole(openingDraw.drawn, roleLevels, normalizeRulesetId(ruleset)),
     lastAttack: null,
     lastDefense: null,
     // 直前の敵ターンで各敵が行った行動。

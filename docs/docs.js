@@ -13,7 +13,7 @@ import {
   CARD_BY_KEY,
   DEFAULT_DECK_COUNTS,
 } from "../src/data/cards.js";
-import { BONUS_ROLES, PENALTY_ROLES, ROLE_FAMILIES } from "../src/data/roles.js";
+import { BONUS_ROLES, COLOR_ROLES, PENALTY_ROLES, ROLE_FAMILIES } from "../src/data/roles.js";
 import { summarizeDeck, bucketLimit } from "../src/game/deckBuilder.js";
 import { DEFAULT_RULESET_ID, RULESETS } from "../src/game/rulesets.js";
 import {
@@ -286,6 +286,20 @@ table(
     `${TACTICAL_ABILITIES[type]?.targetCount ?? 1}`,
     cards.map((card) => tacticalText(card.tacticalAbility)).join("<br />"),
     cards.map((card) => `${card.name}（Cost ${card.cost}）`).join("<br />"),
+  ]),
+);
+
+// ---- 7.6 色の役 ----
+// 色が一様に付いた手札5枚での実測値（10万回）。コード上には無い値なので表示用に保持する。
+const COLOR_ROLE_FREQUENCY = { flush: "0.41%", four_flush: "5.87%", three_flush: "35.45%" };
+table(
+  document.querySelector("#color-roles-table"),
+  ["役", "条件", "倍率", "単独成立率"],
+  COLOR_ROLES.map((role) => [
+    `<b>${role.name}</b>${role.minHandSize ? `<br /><small>最低${role.minHandSize}枚</small>` : ""}`,
+    role.description,
+    `<b class="is-bonus">${multiplierLabel(role.multiplier)}</b>`,
+    COLOR_ROLE_FREQUENCY[role.id] ?? "—",
   ]),
 );
 

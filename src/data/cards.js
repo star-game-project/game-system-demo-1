@@ -218,7 +218,7 @@ export const DEFAULT_DECK_COUNTS = Object.freeze({
   parry_2: 1,
 });
 
-function instantiate(definition, index) {
+function instantiate(definition, index, color = null) {
   return {
     ...definition,
     id: `${definition.key}_${index + 1}`,
@@ -231,16 +231,21 @@ function instantiate(definition, index) {
     tacticalAbility: definition.tacticalAbility
       ? { ...definition.tacticalAbility }
       : null,
+    // ダイスの色は「ダイスの色（試作）」のときだけ持つ。現行ルールのカードには付けない。
+    ...(color ? { color } : {}),
   };
 }
 
-/** { cardKey: 枚数 } からデッキの実体を作る。 */
-export function createDeckFromCounts(counts) {
+/**
+ * { cardKey: 枚数 } からデッキの実体を作る。
+ * colors（{ cardKey: [色, …] }）を渡すと、i 枚目のカードに i 番目の色を付ける。
+ */
+export function createDeckFromCounts(counts, colors = null) {
   return Object.entries(counts).flatMap(([key, count]) => {
     const definition = CARD_BY_KEY[key];
     if (!definition || count <= 0) return [];
     return Array.from({ length: count }, (_, index) =>
-      instantiate(definition, index),
+      instantiate(definition, index, colors?.[key]?.[index] ?? null),
     );
   });
 }

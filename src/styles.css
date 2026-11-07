@@ -1836,3 +1836,32 @@ a:focus-visible {
   color: var(--amber);
   border-color: color-mix(in srgb, var(--amber) 50%, transparent);
 }
+
+/* ---------- ダイスの色（ルール「ダイスの色（試作）」） ---------- */
+
+.dice-color {
+  display: inline-block;
+  font-size: 10px;
+  font-weight: 800;
+  line-height: 1.6;
+  padding: 0 6px;
+  border: 1px solid currentColor;
+  vertical-align: middle;
+}
+
+.dice-color--red { color: #ff6b78; }
+.dice-color--blue { color: #5ea8ff; }
+.dice-color--green { color: #5fd38f; }
+.dice-color--yellow { color: #ffd34d; }
+
+.battle-card .dice-color {
+  position: absolute;
+  top: 52px;
+  left: 12px;
+}
+
+/* 色があるときは、目ごとの色分け（.die-N）よりダイスの色を優先して塗る。 */
+.battle-card.dice-accent--red, .catalogue-card.dice-accent--red { --card-accent: #ff6b78; }
+.battle-card.dice-accent--blue, .catalogue-card.dice-accent--blue { --card-accent: #5ea8ff; }
+.battle-card.dice-accent--green, .catalogue-card.dice-accent--green { --card-accent: #5fd38f; }
+.battle-card.dice-accent--yellow, .catalogue-card.dice-accent--yellow { --card-accent: #ffd34d; }

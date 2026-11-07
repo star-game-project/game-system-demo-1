@@ -47,6 +47,8 @@ import {
   RULESET_BY_ID,
   normalizeRulesetId,
 } from "./game/rulesets.js";
+import { DICE_COLOR_BY_ID } from "./data/diceColors.js";
+import { applyRewardColors, rollDiceColor, rollRunColors } from "./game/colorLogic.js";
 import {
   applyReward,
   applyRoleUpgrade,
@@ -73,6 +75,8 @@ let pendingTactical = null;
 let runCounts = null;
 // 連戦中の役の強化レベル（{ 役id: レベル }）。報酬で上がり、1戦目からやり直すと消える。
 let runRoleLevels = {};
+// 連戦中のデッキの色（{ cardKey: [1枚目の色, …] }）。「ダイスの色（試作）」のときだけ持ち、現行ルールでは null。
+let runColors = null;
 // 報酬画面の状態：{ offers, gainKey, removeKey, roleOffers, roleKey, battle, playerHp }
 let reward = null;
 
@@ -80,6 +84,8 @@ let reward = null;
 function startRun() {
   runCounts = { ...deckCounts };
   runRoleLevels = {};
+  // 色は連戦を始めるときに1枚ずつ決め、連戦中は変わらない。
+  runColors = ruleset === "dice_color" ? rollRunColors(runCounts) : null;
   startBattle();
 }
 
@@ -89,7 +95,7 @@ function startBattle(carry = {}) {
   pendingTactical = null;
   reward = null;
   engine = new BattleEngine(
-    createInitialGameState(Math.random, createDeckFromCounts(runCounts), {
+    createInitialGameState(Math.random, createDeckFromCounts(runCounts, runColors), {
       pointRules,
       ruleset,
       roleLevels: runRoleLevels,
@@ -101,10 +107,15 @@ function startBattle(carry = {}) {
 
 function openReward() {
   const { state } = engine;
+  const offers = drawRewardOffers();
   reward = {
-    offers: drawRewardOffers(),
+    offers,
+    // 候補の色は先に決めて見せる（入手したらその色になる）。
+    offerColors: runColors ? offers.map(() => rollDiceColor()) : null,
     gainKey: null,
     removeKey: null,
+    // 色があるときは、同じカードでも色ごとに別の1枚として削除を選ぶ。
+    removeIndex: null,
     roleOffers: drawRoleOffers(),
     roleKey: null,
     battle: state.battle,
@@ -433,6 +444,8 @@ function renderHand(state) {
       const classes = [
         "battle-card",
         `die-${card.dieValue}`,
+        // 色があるときは、目ごとの色分けの代わりにダイスの色でカードを塗る。
+        card.color ? `dice-accent--${card.color}` : "",
         tactical ? "battle-card--tactical" : "",
         isWildCard(card) ? "battle-card--wild" : "",
         selected ? "is-selected" : "",
@@ -451,12 +464,13 @@ function renderHand(state) {
           style="--card-index:${index}"
           ${interactive ? "" : "disabled"}
           aria-pressed="${selected || isTarget}"
-          aria-label="${card.name}、目${card.dieValue}、${tactical ? tacticalLabel(card.tacticalAbility) : defense ? `防御${card.defense}` : `攻撃${card.attack}`}、コスト${card.cost}"
+          aria-label="${card.name}、目${card.dieValue}${card.color ? `、${DICE_COLOR_BY_ID[card.color].label}` : ""}、${tactical ? tacticalLabel(card.tacticalAbility) : defense ? `防御${card.defense}` : `攻撃${card.attack}`}、コスト${card.cost}"
         >
           <span class="battle-card__edge"></span>
           <span class="battle-card__cost"><small>COST</small>${card.cost}</span>
           <span class="battle-card__index">${String(index + 1).padStart(2, "0")}</span>
           <span class="battle-card__die" aria-hidden="true">${isWildCard(card) ? "◈" : DIE_FACES[card.dieValue]}</span>
+          ${colorChip(card.color)}
           ${tuned ? `<span class="tuned-flag">TUNED ${card.baseDieValue}→${card.dieValue}</span>` : ""}
           <span class="battle-card__name">${card.name}</span>
           ${
@@ -578,6 +592,12 @@ function renderResult(state) {
   `;
 }
 
+
+/** ダイスの色の札。色が無い（現行ルール）ときは何も出さない。 */
+function colorChip(color) {
+  if (!color) return "";
+  return `<span class="dice-color dice-color--${color}">${DICE_COLOR_BY_ID[color].label}</span>`;
+}
 
 function dieGlyph(definition) {
   return dieBucket(definition) === "wild" ? "◈" : DIE_FACES[definition.dieValue];
@@ -731,14 +751,14 @@ function cardStatLabel(definition) {
 }
 
 /** 報酬・デッキ一覧で使う、操作ボタンを1つ持つカード。 */
-function rewardCard(definition, { count = null, selected = false, disabled = false, data, buttonLabel }) {
+function rewardCard(definition, { count = null, color = null, selected = false, disabled = false, data, buttonLabel }) {
   const bucket = dieBucket(definition);
   return `
-    <article class="catalogue-card ${bucket === "wild" ? "catalogue-card--wild" : `die-${definition.dieValue}`} ${definition.tacticalAbility ? "catalogue-card--tactical" : ""} ${selected ? "is-included reward-card--selected" : ""}">
+    <article class="catalogue-card ${bucket === "wild" ? "catalogue-card--wild" : `die-${definition.dieValue}`} ${color ? `dice-accent--${color}` : ""} ${definition.tacticalAbility ? "catalogue-card--tactical" : ""} ${selected ? "is-included reward-card--selected" : ""}">
       <header>
         <span class="catalogue-card__die">${dieGlyph(definition)}</span>
         <div>
-          <strong>${definition.name}${count === null ? "" : ` ×${count}`}</strong>
+          <strong>${definition.name}${count === null ? "" : ` ×${count}`} ${colorChip(color)}</strong>
           <small>${cardStatLabel(definition)} / COST ${definition.cost}</small>
         </div>
       </header>
@@ -753,25 +773,41 @@ function renderReward() {
   const deckEntries = CARD_CATALOGUE.filter((definition) => (runCounts[definition.key] ?? 0) > 0);
   const result = applyReward(runCounts, offers, reward);
 
-  const offerCards = offers.map((key) =>
+  const offerCards = offers.map((key, index) =>
     rewardCard(CARD_BY_KEY[key], {
+      color: reward.offerColors?.[index] ?? null,
       selected: gainKey === key,
       data: `data-reward-gain="${key}"`,
       buttonLabel: gainKey === key ? "選択中（もう一度で解除）" : "これを入手",
     }),
   ).join("");
 
-  const deckCards = deckEntries.map((definition) => {
+  const removeButtonLabel = (selected, removable) =>
+    selected ? "削除する（もう一度で解除）" : removable ? "1枚削除" : `${DECK_RULES.MIN_DECK_SIZE}枚未満になるため不可`;
+  // 色があるときは1枚ずつ並べ、どの色の1枚を削除するかを選べるようにする。
+  const deckCards = deckEntries.flatMap((definition) => {
     const key = definition.key;
+    const removable = canRemoveFromRun(runCounts, key, gainKey);
+    if (runColors) {
+      return runColors[key].map((color, index) => {
+        const selected = removeKey === key && reward.removeIndex === index;
+        return rewardCard(definition, {
+          color,
+          selected,
+          disabled: !(selected || removable),
+          data: `data-reward-remove="${key}" data-remove-index="${index}"`,
+          buttonLabel: removeButtonLabel(selected, selected || removable),
+        });
+      });
+    }
     const selected = removeKey === key;
-    const removable = selected || canRemoveFromRun(runCounts, key, gainKey);
-    return rewardCard(definition, {
+    return [rewardCard(definition, {
       count: runCounts[key],
       selected,
-      disabled: !removable,
+      disabled: !(selected || removable),
       data: `data-reward-remove="${key}"`,
-      buttonLabel: selected ? "削除する（もう一度で解除）" : removable ? "1枚削除" : `${DECK_RULES.MIN_DECK_SIZE}枚未満になるため不可`,
-    });
+      buttonLabel: removeButtonLabel(selected, selected || removable),
+    })];
   }).join("");
 
   const { roleOffers, roleKey } = reward;
@@ -795,8 +831,11 @@ function renderReward() {
   }).join("");
   const roleText = roleKey ? `${ROLE_BY_ID[roleKey].name} を強化` : "強化しない";
 
-  const gainText = gainKey ? `${CARD_BY_KEY[gainKey].name} を入手` : "入手しない";
-  const removeText = removeKey ? `${CARD_BY_KEY[removeKey].name} を1枚削除` : "削除しない";
+  const gainColor = gainKey ? reward.offerColors?.[offers.indexOf(gainKey)] : null;
+  const removeColor = removeKey && reward.removeIndex !== null ? runColors?.[removeKey]?.[reward.removeIndex] : null;
+  const colorText = (color) => (color ? `（${DICE_COLOR_BY_ID[color].label}）` : "");
+  const gainText = gainKey ? `${CARD_BY_KEY[gainKey].name}${colorText(gainColor)} を入手` : "入手しない";
+  const removeText = removeKey ? `${CARD_BY_KEY[removeKey].name}${colorText(removeColor)} を1枚削除` : "削除しない";
 
   return `
     <main class="build-shell">
@@ -1072,6 +1111,7 @@ function bindEvents() {
       // 入手を外して最小枚数を割る場合は、削除の選択も外す。
       if (reward.removeKey && !canRemoveFromRun(runCounts, reward.removeKey, reward.gainKey)) {
         reward.removeKey = null;
+        reward.removeIndex = null;
       }
       render();
     });
@@ -1088,7 +1128,10 @@ function bindEvents() {
   app.querySelectorAll("[data-reward-remove]").forEach((button) => {
     button.addEventListener("click", () => {
       const key = button.dataset.rewardRemove;
-      reward.removeKey = reward.removeKey === key ? null : key;
+      const index = button.dataset.removeIndex === undefined ? null : Number(button.dataset.removeIndex);
+      const same = reward.removeKey === key && reward.removeIndex === index;
+      reward.removeKey = same ? null : key;
+      reward.removeIndex = same ? null : index;
       render();
     });
   });
@@ -1157,6 +1200,10 @@ function bindEvents() {
         render();
       }
       if (action === "next-battle" && reward) {
+        if (runColors) {
+          const gainColor = reward.gainKey ? reward.offerColors[reward.offers.indexOf(reward.gainKey)] : null;
+          runColors = applyRewardColors(runColors, runCounts, reward.offers, { ...reward, gainColor });
+        }
         runCounts = applyReward(runCounts, reward.offers, reward);
         runRoleLevels = applyRoleUpgrade(runRoleLevels, reward.roleOffers, reward.roleKey);
         startBattle({ battle: reward.battle + 1, playerHp: reward.playerHp });

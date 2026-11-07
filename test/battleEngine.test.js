@@ -844,3 +844,36 @@ test("the catalogue offers Sweep 3 as an area attack outside the starter deck", 
   assert.equal(sweep.target, "all");
   assert.equal(DEFAULT_DECK_COUNTS.sweep_3, undefined);
 });
+
+// ---- 戦闘のスキップ（デモ限定） ----
+
+test("skipping a battle wins it on the spot and changes nothing else", () => {
+  for (const phase of [PHASES.DRAW_SELECT, PHASES.CARD_SELECT]) {
+    const state = createInitialGameState(() => 0.5, null, { items: ["heal_potion"] });
+    state.phase = phase;
+    state.player.hp = 77;
+    const deckBefore = [...state.player.deck, ...state.player.hand, ...state.player.discardPile].length;
+    const engine = new BattleEngine(state, () => 0.5);
+
+    assert.equal(engine.skipBattle(), true, phase);
+    assert.equal(engine.state.phase, PHASES.VICTORY);
+    assert.ok(engine.state.enemies.every((enemy) => enemy.hp === 0));
+    assert.equal(engine.state.player.hp, 77);
+    assert.deepEqual(engine.state.player.items, ["heal_potion"]);
+    assert.equal(
+      [...engine.state.player.deck, ...engine.state.player.hand, ...engine.state.player.discardPile].length,
+      deckBefore,
+    );
+  }
+});
+
+test("a battle can be skipped only on your own turn", () => {
+  for (const phase of [PHASES.CPU_ATTACK, PHASES.PLAYER_ATTACK, PHASES.VICTORY, PHASES.DEFEAT]) {
+    const state = createInitialGameState(() => 0.5);
+    state.phase = phase;
+    const engine = new BattleEngine(state, () => 0.5);
+    assert.equal(engine.canSkipBattle(), false, phase);
+    assert.equal(engine.skipBattle(), false, phase);
+    assert.equal(engine.state.phase, phase);
+  }
+});

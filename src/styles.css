@@ -1928,3 +1928,10 @@ a:focus-visible {
 .start-item > div:first-child { display: grid; gap: 2px; }
 .start-item strong { font-size: 13px; }
 .start-item small { font-size: 10px; color: var(--muted); }
+
+/* デモ用の操作（戦闘のスキップなど）は、通常の操作と見分けがつくようにする。 */
+.icon-button--demo {
+  border-style: dashed;
+  color: var(--amber);
+}
+.icon-button--demo:disabled { opacity: 0.35; cursor: default; }

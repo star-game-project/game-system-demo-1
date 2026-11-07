@@ -1059,6 +1059,7 @@ function render() {
         </a>
         <div class="topbar__center"><span>BATTLE</span><strong>#${String(state.battle).padStart(3, "0")}</strong><span>DECK ${countCards(runCounts)}</span><span class="ruleset-chip ruleset-chip--${state.ruleset}">${RULESET_BY_ID[state.ruleset].label}</span></div>
         <div class="topbar__actions">
+          <button class="icon-button icon-button--demo" data-action="skip-battle" ${engine.canSkipBattle() ? "" : "disabled"} aria-label="戦闘をスキップして報酬へ（デモ用）" title="戦闘をスキップして報酬へ（デモ用）">⏭</button>
           <button class="icon-button" data-action="show-roles" aria-label="役一覧" title="役一覧">役</button>
           <button class="icon-button" data-action="edit-deck" aria-label="デッキを編集" title="デッキを編集">☰</button>
           <button class="icon-button" data-action="restart" aria-label="1戦目からやり直す" title="1戦目からやり直す">↻</button>
@@ -1320,6 +1321,12 @@ function bindEvents() {
         clearTimers();
         cancelTargeting();
         screen = SCREENS.DECK_BUILD;
+        render();
+      }
+      if (action === "skip-battle" && engine.skipBattle()) {
+        clearTimers();
+        cancelTargeting();
+        openReward();
         render();
       }
       if (action === "open-reward" && engine.state.phase === PHASES.VICTORY) {

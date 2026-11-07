@@ -443,6 +443,26 @@ export class BattleEngine {
     return { item };
   }
 
+  /** 戦闘をスキップできるか。自分のターン中（ドロー選択・カード使用）だけ。 */
+  canSkipBattle() {
+    return [PHASES.DRAW_SELECT, PHASES.CARD_SELECT].includes(this.state.phase);
+  }
+
+  /**
+   * 戦闘に勝ったことにして終える（デモ限定）。デッキ構築や報酬を手早く確かめるためのもの。
+   * HP・アイテム・デッキは今のまま変えない。
+   */
+  skipBattle() {
+    if (!this.canSkipBattle()) return false;
+    this.state.enemies.forEach((enemy) => {
+      enemy.hp = 0;
+    });
+    this.state.selectedCardId = null;
+    this.state.phase = PHASES.VICTORY;
+    this.state.battleMessage = "戦闘をスキップしました（デモ用）。";
+    return true;
+  }
+
   /** カードを使い終えたらプレイヤーが自分でターンを終了する。いつでも終了できる。 */
   endTurn() {
     if (this.state.phase !== PHASES.CARD_SELECT) return false;

@@ -288,6 +288,46 @@ table(
   ]),
 );
 
+// ---- 0.1 デモ限定・変更予定・検討中の一覧 ----
+// 本文中の印（.docs-callout）から集めるので、印を足せば一覧にも載る。
+const NOTE_KINDS = [
+  ["demo", "デモ限定"],
+  ["plan", "変更予定"],
+  ["open", "検討中"],
+];
+const callouts = [...document.querySelectorAll(".docs-callout")];
+callouts.forEach((callout, index) => {
+  if (!callout.id) callout.id = `note-${index + 1}`;
+});
+
+/** 印が属する見出しの文言。h4 は番号を持たないので、親の h3 を前に付ける。 */
+function headingOf(element) {
+  let heading = null;
+  for (let node = element.previousElementSibling; node; node = node.previousElementSibling) {
+    if (!heading && /^H[2-4]$/.test(node.tagName)) {
+      heading = node;
+      if (node.tagName !== "H4") return node.textContent;
+    } else if (heading && /^H[23]$/.test(node.tagName)) {
+      return `${node.textContent} › ${heading.textContent}`;
+    }
+  }
+  return (heading ?? element.closest("section")?.querySelector("h2"))?.textContent ?? "本文";
+}
+
+table(
+  document.querySelector("#status-table"),
+  ["区分", "内容", "本文"],
+  NOTE_KINDS.flatMap(([kind, label]) =>
+    callouts
+      .filter((callout) => callout.classList.contains(`docs-callout--${kind}`))
+      .map((callout) => [
+        `<span class="docs-tag docs-tag--${kind}">${label}</span>`,
+        callout.dataset.summary ?? callout.textContent.trim(),
+        `<a href="#${callout.id}">${headingOf(callout)}</a>`,
+      ]),
+  ),
+);
+
 // ---- 目次 ----
 const toc = document.querySelector("#toc");
 if (toc) {

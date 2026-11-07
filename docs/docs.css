@@ -170,3 +170,51 @@
   .docs-shell { padding: 20px 16px 70px; }
   .docs-toc { grid-template-columns: 1fr; }
 }
+
+/* ---------- 仕様の位置づけ（デモ限定・変更予定・検討中） ---------- */
+
+.docs-status {
+  border: 1px solid color-mix(in srgb, var(--amber) 45%, transparent);
+  background: color-mix(in srgb, var(--amber) 8%, transparent);
+  padding: 14px 18px;
+  margin-bottom: 16px;
+}
+
+.docs-status p { margin: 0; }
+
+.docs-tag {
+  display: inline-block;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  line-height: 1.7;
+  padding: 0 8px;
+  border: 1px solid currentColor;
+  white-space: nowrap;
+}
+
+.docs-tag--demo { color: var(--amber); }
+.docs-tag--plan { color: var(--cyan); }
+.docs-tag--open { color: var(--violet); }
+
+.docs-shell .docs-legend { list-style: none; padding-left: 0; }
+.docs-legend li { display: flex; gap: 12px; align-items: baseline; }
+
+.docs-callout {
+  --callout: var(--amber);
+  border: 1px solid color-mix(in srgb, var(--callout) 38%, transparent);
+  border-left: 3px solid var(--callout);
+  background: color-mix(in srgb, var(--callout) 7%, transparent);
+  padding: 10px 14px;
+  margin: 0 0 15px;
+  font-size: 13px;
+  scroll-margin-top: 18px;
+}
+
+.docs-callout--plan { --callout: var(--cyan); }
+.docs-callout--open { --callout: var(--violet); }
+.docs-callout .docs-tag { margin-bottom: 6px; }
+.docs-shell .docs-callout p { margin: 0; }
+.docs-callout:target { outline: 2px solid var(--callout); outline-offset: 2px; }
+
+#status-table td:first-child { white-space: nowrap; }

@@ -26,18 +26,57 @@
 
     <nav class="docs-toc" id="toc"></nav>
 
+    <section id="status">
+      <h2>0. この仕様書の位置づけ</h2>
+      <div class="docs-status">
+        <p>このデモは、ゲームシステムの骨格を確かめるための<b>試作</b>である。HP・攻撃力・倍率などの数値に限らず、ルール・画面の構成・成長の仕組みも含めて調整中であり、<b>本番の仕様とは異なる</b>。</p>
+      </div>
+      <p>本文中の次の印は、その仕様の位置づけを表す。印のない箇所は、デモの現在の挙動である。</p>
+      <ul class="docs-legend">
+        <li><span class="docs-tag docs-tag--demo">デモ限定</span><span>検証のためにデモでだけそうしている。本番では置かない、または変える。</span></li>
+        <li><span class="docs-tag docs-tag--plan">変更予定</span><span>本番での方針は決まっているが、デモにはまだ反映していない。</span></li>
+        <li><span class="docs-tag docs-tag--open">検討中</span><span>扱いをチームで検討している。</span></li>
+      </ul>
+
+      <h3>0.1 デモ限定・変更予定・検討中の一覧</h3>
+      <div class="docs-table-wrap"><table id="status-table"></table></div>
+      <p class="docs-note">この一覧は本文中の印から自動で集めている。</p>
+    </section>
+
     <section id="overview">
       <h2>1. 概要</h2>
-      <p>プレイヤーが複数の敵（CPU）と戦うターン制カードバトル。プレイヤーはデッキからカードを引き、ポイントを消費してカードを使用し、すべての敵のHPを0にすれば勝利する。</p>
-      <p>本デモは戦闘のコアルールが成立するかを確認することを目的とし、以下2つの画面で構成される。</p>
+      <p>プレイヤーが敵と戦うターン制カードバトル。手札のダイス目の組み合わせで役を作り、攻撃に倍率を掛ける。プレイヤーはデッキからカードを引き、ポイントを消費してカードを使い、すべての敵のHPを0にすれば戦闘に勝利する。勝利すると報酬でデッキや役を育て、次の戦闘へ進む。</p>
+
+      <h3>1.1 デモの流れ</h3>
+      <pre><code>デッキ構築 → 戦闘 → 報酬 → 戦闘 → 報酬 → …   （負けたら1戦目から）</code></pre>
       <ul>
-        <li><b>DECK CONSTRUCTION</b> — カード一覧から初期デッキ（6〜20枚）を構築する</li>
-        <li><b>BATTLE</b> — 構築したデッキでCPUと戦う</li>
+        <li><b>DECK CONSTRUCTION</b> — カード一覧から初期デッキ（6〜20枚）を構築する（3章）</li>
+        <li><b>BATTLE</b> — 構築したデッキで敵と戦う（5〜10章）</li>
+        <li><b>REWARD</b> — 勝利後、カードの入手・削除と役の強化を行う（11.2・11.3）</li>
       </ul>
       <p>戦闘は必ずデッキ構築から始まる。戦闘中はいつでも構築画面に戻れる（デッキ内容は保持される）。</p>
+      <aside class="docs-callout docs-callout--demo" data-summary="構築画面は本番では置かない。本文の「構築画面」はタイトル画面と読み替える">
+        <span class="docs-tag docs-tag--demo">デモ限定</span>
+        <p>デッキ構築画面は、初期デッキを入れ替えて試すためのデモ限定の画面である。本番では置かない可能性が高く、初期デッキは固定にする（3章）。本文中の「構築画面」は、<b>タイトル画面と読み替えて</b>よい。</p>
+      </aside>
+      <aside class="docs-callout docs-callout--plan" data-summary="戦闘・報酬のほかに、ショップ・回復スポット・イベントなどの局面を挟む">
+        <span class="docs-tag docs-tag--plan">変更予定</span>
+        <p>デモでは戦闘と報酬を交互に繰り返すだけだが、本番では<b>戦闘以外の局面</b>（ショップ・回復スポット・イベントなど）も挟む。HPの回復や、カード・役を育てる手段の一部もそこに置く（11.1〜11.3）。</p>
+      </aside>
 
-      <h3>本デモに含まれないもの</h3>
-      <p>オンライン対戦、セーブ、アカウント、カード収集、ショップ、ストーリー、CPU側のカードシステム、高度なCPU思考、BGM・設定画面。</p>
+      <h3>1.2 画面に出す情報</h3>
+      <p>デモでは、判断に必要な情報を隠さずに画面へ出している。敵の次の行動・行動パターン全体と現在位置・溜め込みやブロックの残量・役と倍率・ダメージの内訳・何戦目かとデッキ枚数など。</p>
+      <aside class="docs-callout docs-callout--demo" data-summary="本番では敵の行動パターン全体を出さない。ほかの情報の出し方はUI班と調整">
+        <span class="docs-tag docs-tag--demo">デモ限定</span>
+        <p>情報をすべて出しているのは、デモで仕組みを検証しやすくするためである。本番では、<b>敵の行動パターン全体は表示しない</b>。それ以外の情報をどこに・どこまで出すかは、UI班と調整して決める。</p>
+      </aside>
+
+      <h3>1.3 本デモに含まれないもの</h3>
+      <p>次の一覧は網羅的ではない。現時点で実装していないものはほかにもあり、今後も増える見込み。</p>
+      <ul>
+        <li><b>予定していないもの</b>：オンライン対戦</li>
+        <li><b>未実装（今後追加しうるもの）</b>：セーブ（続きから再開）、アカウント、ショップ・回復スポット・イベント、ストーリー、多くのカード効果、敵側のカード、高度な敵の思考、BGM・設定画面</li>
+      </ul>
     </section>
 
     <section id="constants">
@@ -49,6 +88,10 @@
 
     <section id="deck-build">
       <h2>3. デッキ構築</h2>
+      <aside class="docs-callout docs-callout--demo" data-summary="この章はほぼデモ限定。本番の初期デッキは固定">
+        <span class="docs-tag docs-tag--demo">デモ限定</span>
+        <p>この章の内容は、ほぼすべてデモ限定の仕様である。本番では構築画面を置かず、<b>初期デッキは固定</b>にする（1.1）。構築ルール（3.1〜3.3）と初期構成（3.4）は、デモで初期デッキを入れ替えて試すためにある。</p>
+      </aside>
       <p>カード一覧から <code>+</code> / <code>−</code> で枚数を増減し、6〜20枚にすると <b>BATTLE START</b> が有効になる。最小6枚は「5枚の手札 + 1枚のドロー」を引ける枚数。これらの制約は構築画面だけに掛かり、戦闘後のカード入手・削除には掛からない。</p>
 
       <h3>3.1 構築ルール</h3>
@@ -133,13 +176,18 @@
       <pre><code>point = fullRefill
   ? maxPoint                                  // 毎ターン上限まで全回復（貯められない）
   : Math.min(maxPoint, point + recovery)</code></pre>
-      <p>開始値・上限・回復量・全回復の有無は<b>デッキ構築画面の POINT RULES で変更できる</b>（1〜20の整数。開始値は上限を超えない）。既定値は2章の定数（開始10・上限10・+5）。比較用に次のプリセットがある。設定は連戦中も引き継ぎ、戦闘画面のポイント欄にも表示する。</p>
+      <p>開始値・上限・回復量・全回復の有無をまとめて<b>ポイントの設定</b>と呼ぶ。つまり、カードの使用に使うポイントの初期値・最大値・ターンごとの回復量である。</p>
+      <p>ポイントの設定は<b>デッキ構築画面の POINT RULES で変更できる</b>（1〜20の整数。開始値は上限を超えない）。既定値は2章の定数（開始10・上限10・+5）。比較用に次のプリセットがある。設定は連戦中も引き継ぎ、戦闘画面のポイント欄にも表示する。</p>
       <ul>
         <li>標準：開始10 / 上限10 / +5</li>
         <li>A：開始10 / 上限10 / +3</li>
         <li>B：開始6 / 上限6 / +5</li>
         <li>C：開始5 / 上限5 / 毎ターン5まで全回復</li>
       </ul>
+      <aside class="docs-callout docs-callout--demo" data-summary="ポイントの設定を画面で変えられるのはデモ限定。本番の値はバランスを見て開発側で決める">
+        <span class="docs-tag docs-tag--demo">デモ限定</span>
+        <p>ポイントの設定を画面で変えられるのは、案を遊び比べるためのデモ限定の機能である。本番の値はバランスを見て開発側で決め、プレイヤーは変更しない。</p>
+      </aside>
       <p>カードは種類を問わずポイントが続く限り何枚でも使えるため、<b>ポイントが1ターンに使えるカード枚数の上限</b>になる。</p>
 
       <h3>6.2 ドロー</h3>
@@ -157,7 +205,15 @@
       <h3>6.4 シールド</h3>
       <p><b>ターンをまたがない</b>。ターン終了時に0へ戻す。</p>
       <p><b>シールド</b>は防御カード（Brace 1・Parry 2：コスト1でシールド+10）と戦術カード Guard（コスト2でシールド+14）で得る。</p>
+      <aside class="docs-callout docs-callout--plan" data-summary="シールドの入手元を防御カードに統合する（Guard を防御カードにそろえる）">
+        <span class="docs-tag docs-tag--plan">変更予定</span>
+        <p>シールドを得る手段を、防御カードと戦術カード Guard に分けておく必要はないため、<b>防御カードに統合する</b>。</p>
+      </aside>
       <p><b>防御カード</b>は攻撃カードと同じく、カード選択 → EXECUTE（DEFEND）で使用する。攻撃と同じくターンは終了しない。防御値に役の倍率は掛からない。</p>
+      <aside class="docs-callout docs-callout--open" data-summary="防御値に役の倍率を掛けるか">
+        <span class="docs-tag docs-tag--open">検討中</span>
+        <p>防御値に役の倍率を掛けるかは、今後の調整次第。倍率が大きくなる（インフレする）方向に調整するなら、防御には掛けない方が安全である。</p>
+      </aside>
       <p>シールドはCPUの攻撃を先に吸収し、残った分だけHPが減る。CPUの次の行動は常に予告されるので、必要なシールド量は常に計算できる。</p>
       <pre><code>incoming = intent.value + cpu.charge   // ATTACK のとき
 absorbed = Math.min(shield, incoming)
@@ -211,6 +267,10 @@ hp      -= taken</code></pre>
 1, 2, 3, 4, 6  →  FOUR STRAIGHT  ×1.35                         （4を作って脱出）
 1, 2, 3, 4, 5  →  FIVE STRAIGHT  ×1.7</code></pre>
       <p>これにより、Tune Up で4を作る、Recycle で1か2を捨てるといった対処が意味を持つ。</p>
+      <aside class="docs-callout docs-callout--open" data-summary="減算役（不利な役）を残すかどうか">
+        <span class="docs-tag docs-tag--open">検討中</span>
+        <p>そもそも減算役（不利な役）が必要かどうかを検討している。</p>
+      </aside>
 
       <h3>7.4 ワイルド</h3>
       <p>Wild Die は役判定において任意の目として扱われる。実装はワイルドに割り当てうる目の全組み合わせを評価し、<b>最も倍率が高くなる解釈</b>を採用する。</p>
@@ -232,6 +292,10 @@ hp      -= taken</code></pre>
       <p>カードが手札にある間つねに有効。手札の構成が変化するたびに再計算する。</p>
       <div class="docs-table-wrap"><table id="passive-table"></table></div>
       <p>手札には明確な順番があり、UI上も左から右へその順で表示する。<code>RIGHT_CARD_ATTACK_BONUS</code> はこの並び順に依存するため、Reorder で並びを操作できる。</p>
+      <aside class="docs-callout docs-callout--open" data-summary="常在能力をカードに持たせるか（別の強化軸・キャラクターの能力にする案）">
+        <span class="docs-tag docs-tag--open">検討中</span>
+        <p>常在能力をカードに持たせるべきかを検討している。カードからは外し、<b>別の強化軸（キャラクターの能力など）</b>として扱う案がある。とくに Support 3 の「右隣のカードの攻撃力+5」を常在能力として扱っている点は見直しの対象。</p>
+      </aside>
 
       <h3>8.3 戦術能力（tacticalAbility）</h3>
       <p>戦術カードは<b>攻撃せず、ターンも終了しない</b>。ポイントが続く限り同一ターン中に何枚でも使用できる。</p>
@@ -243,6 +307,10 @@ hp      -= taken</code></pre>
       <h4>目の変更の永続性</h4>
       <p>Tune Up / Tune Down / Overclock による目の変更は<b>その戦闘の間ずっと残る</b>。<code>baseDieValue</code> と比較して変化を検出し、UI上は <code>TUNED 2→1</code> のように表示する。手札が毎ターン捨てられる仕様上、1ターン限りの効果ではコストに見合わないためである。山札は約4ターンで一巡するので、変更したカードは戦闘中に再び手札へ戻る。</p>
       <p>目は1〜6の範囲に収める（範囲外にはならず、上限・下限で止まる）。</p>
+      <aside class="docs-callout docs-callout--open" data-summary="戦術カードで変えた目を戦闘中ずっと残すか">
+        <span class="docs-tag docs-tag--open">検討中</span>
+        <p>変えた目を戦闘中ずっと残す仕様には疑問が出ており、見直しの候補である。</p>
+      </aside>
 
       <h3>8.4 一時効果（temporaryEffects）</h3>
       <p>使用時能力などで発生した一時的な効果を配列で管理し、有効ターンを過ぎたら取り除く。</p>
@@ -291,6 +359,7 @@ Temporary Bonus +5   （前ターンの Boost 2 による）
       <p>1回の戦闘には<b>同じ種類の敵が2体</b>出る（<code>src/data/enemies.js</code> の <code>ENCOUNTER</code>）。2体の合計が旧仕様の1体（HP100・1ターン平均14ダメージ）と同じになるよう、1体あたり <b>HP50</b>、行動パターンの数値は半分にしてある。2体の行動周期はそろっており、同じターンに同じ行動をする。</p>
       <p>敵はカードを使用せず、<b>行動パターン</b>（<code>CPU_ACTION_PATTERN</code>）を先頭から1ターンに1つずつ実行する。末尾の次は先頭に戻る。ランダム性はない。</p>
       <p>各敵の次の行動（<b>行動予告</b>）、パターン全体・現在位置、溜め込み・ブロックの残量は常に画面に表示される。予告された行動がそのまま実行される。</p>
+      <p class="docs-note">行動パターン全体の表示はデモ限定で、本番では出さない（1.2）。</p>
       <pre><code>intent = enemy.actionPattern[enemy.actionIndex]
 enemy.actionIndex = (enemy.actionIndex + 1) % enemy.actionPattern.length</code></pre>
       <p>現在のパターンは <code>ATTACK 7 → CHARGE +7 → ATTACK 14 → BLOCK 15</code> の4ターン周期。3ターン目の攻撃は溜め込み分が乗って <b>21</b> になる（2体で42）。1体の1周の与ダメージ合計は28で、2体合わせて1ターン平均14。</p>
@@ -333,13 +402,21 @@ target.hp    -= dealt</code></pre>
       <p>HPは0未満にならない。</p>
 
       <h3>11.1 連戦</h3>
-      <p>勝利すると <b>REWARD</b> で報酬画面（11.2）に進み、そこから <b>NEXT BATTLE</b> で次の戦闘に進む。何戦目かと今のデッキ枚数は画面上部に <code>BATTLE #002 DECK 9</code> のように表示する。</p>
+      <p>勝利すると <b>REWARD</b> で報酬画面（11.2）に進み、そこから <b>NEXT BATTLE</b> で次の戦闘に進む。何戦目かと今のデッキ枚数は画面上部に <code>BATTLE #002 DECK 9</code> のように表示する（表示の仕方はUI班と調整する。1.2）。</p>
       <ul>
-        <li><b>引き継ぐもの</b>：プレイヤーの残りHP（回復しない）と、報酬で入手・削除したデッキ</li>
+        <li><b>引き継ぐもの</b>：プレイヤーの残りHP（回復しない）、報酬で入手・削除したデッキ、役の強化レベル（11.3）、ポイントの設定（6.1。カードに使うポイントの初期値・最大値・回復量）</li>
         <li><b>リセットするもの</b>：山札（その時点のデッキから作り直してシャッフル）・ポイント・シールド・ターン数・敵（HP・行動パターンの位置・溜め込み・ブロック）・攻撃の対象</li>
         <li>敵は毎戦同じ（2体・HP・行動パターンとも変わらない）</li>
       </ul>
+      <aside class="docs-callout docs-callout--plan" data-summary="戦闘ごとに敵の構成・強さを変える">
+        <span class="docs-tag docs-tag--plan">変更予定</span>
+        <p>本番では、戦闘ごとに敵の構成や強さを変える。</p>
+      </aside>
       <p>敗北すると <b>RETRY FROM #001</b> で1戦目からやり直す。デッキも構築画面のデッキに戻る。敗北画面には何戦目で敗れたかを表示する。<b>EDIT DECK</b> で構築に戻った場合も、次の戦闘は1戦目から始まる。</p>
+      <aside class="docs-callout docs-callout--plan" data-summary="タイトルに戻っても続きから再開できるようにする">
+        <span class="docs-tag docs-tag--plan">変更予定</span>
+        <p>構築画面は本番では置かない予定のため、ここでの「構築画面に戻る」は<b>タイトル画面に戻る</b>と読み替える。本番では、タイトルに戻っても<b>続きから再開</b>できるようにする。</p>
+      </aside>
 
       <h3>11.2 報酬（成長）</h3>
       <p>勝利後の報酬画面で、デッキを育てる。どちらも任意で、選んだ内容は NEXT BATTLE を押した時点で確定する。</p>
@@ -348,6 +425,10 @@ target.hp    -= dealt</code></pre>
         <li><b>削除</b>：今のデッキから<b>1枚まで</b>削除する。入手分を含めたデッキが最小枚数（6枚）を下回る削除はできない。</li>
         <li>構築画面の制約（目の上限・同名の上限・最大20枚）は、連戦中のデッキには掛けない。</li>
       </ul>
+      <aside class="docs-callout docs-callout--plan" data-summary="戦闘後の報酬はカードの入手だけにし、役の強化とカードの削除は別の場面で用意する">
+        <span class="docs-tag docs-tag--plan">変更予定</span>
+        <p>本番では、<b>戦闘後の報酬はカードの入手だけ</b>にする。役の強化（11.3）とカードの削除は、ショップなど別の場面で用意する（1.1）。強化の手段・条件も今後増やしていく。</p>
+      </aside>
       <p>報酬画面には残りHP、今のデッキの全カードと枚数、確定後のデッキ枚数、現在の役のレベルを表示する。ロジックは <code>src/game/rewardLogic.js</code>、枚数は <code>REWARD_RULES</code> で管理する。</p>
 
       <h3>11.3 役の強化</h3>
@@ -361,6 +442,14 @@ target.hp    -= dealt</code></pre>
         <li>上げ幅は当面一律。役の成立しやすさに合わせた調整は今後行う。</li>
       </ul>
       <p>戦闘中の役一覧（「役」ボタン）と報酬画面の役一覧には、強化後の倍率と元の倍率・レベルを表示する。</p>
+      <aside class="docs-callout docs-callout--plan" data-summary="強化する役はランダムな候補ではなく自由に選べるようにする">
+        <span class="docs-tag docs-tag--plan">変更予定</span>
+        <p>本番では、強化する役をランダムな候補からではなく、<b>自由に選べる</b>ようにする。</p>
+      </aside>
+      <aside class="docs-callout docs-callout--open" data-summary="強化を足し算にするか掛け算にするか">
+        <span class="docs-tag docs-tag--open">検討中</span>
+        <p>強化は当面足し算にしているが、今後のバランス次第では掛け算（例：1レベルごとに5%増）にする可能性がある。</p>
+      </aside>
     </section>
 
     <section id="state">

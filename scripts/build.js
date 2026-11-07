@@ -1,7 +1,10 @@
-import { cp, mkdir, rm } from "node:fs/promises";
+import { cp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 
 const root = process.cwd();
+// 静的ホスティング（GitHub Pages など）には worker がいないため、
+// index.html の __SITE_ORIGIN__ をビルド時に埋める。未指定なら worker が実行時に置換する。
+const siteOrigin = process.env.SITE_ORIGIN?.replace(/\/+$/, "");
 const dist = join(root, "dist");
 const client = join(dist, "client");
 const server = join(dist, "server");
@@ -10,10 +13,16 @@ await rm(dist, { recursive: true, force: true });
 await mkdir(client, { recursive: true });
 await mkdir(server, { recursive: true });
 
-await cp(join(root, "index.html"), join(client, "index.html"));
+const indexHtml = await readFile(join(root, "index.html"), "utf8");
+await writeFile(
+  join(client, "index.html"),
+  siteOrigin ? indexHtml.replaceAll("__SITE_ORIGIN__", siteOrigin) : indexHtml,
+);
 await cp(join(root, "src"), join(client, "src"), { recursive: true });
 await cp(join(root, "docs"), join(client, "docs"), { recursive: true });
 await cp(join(root, "public"), client, { recursive: true });
 await cp(join(root, "worker", "index.js"), join(server, "index.js"));
 
-console.log("Sites build completed: dist/client + dist/server");
+console.log(
+  `Sites build completed: dist/client + dist/server${siteOrigin ? ` (origin: ${siteOrigin})` : ""}`,
+);

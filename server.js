@@ -16,12 +16,22 @@ const MIME_TYPES = {
 
 const server = createServer(async (request, response) => {
   try {
-    const pathname = decodeURIComponent(new URL(request.url, `http://${request.headers.host}`).pathname);
+    const url = new URL(request.url, `http://${request.headers.host}`);
+    const pathname = decodeURIComponent(url.pathname);
     const requestedPath = normalize(pathname).replace(/^(\.\.[/\\])+/, "");
     let filePath = join(ROOT, requestedPath === "/" ? "index.html" : requestedPath);
     const fileStat = await stat(filePath);
 
-    if (fileStat.isDirectory()) filePath = join(filePath, "index.html");
+    if (fileStat.isDirectory()) {
+      // ページ内の相対パスは末尾の "/" を前提にしているため、
+      // GitHub Pages と同じく /docs は /docs/ へ寄せる。
+      if (!pathname.endsWith("/")) {
+        response.writeHead(301, { Location: `${pathname}/${url.search}` });
+        response.end();
+        return;
+      }
+      filePath = join(filePath, "index.html");
+    }
     if (!filePath.startsWith(ROOT)) throw new Error("Invalid path");
 
     const body = await readFile(filePath);

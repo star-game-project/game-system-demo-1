@@ -24,6 +24,12 @@ export default {
       response = await env.ASSETS.fetch(
         new Request(new URL(directoryIndex, url), request),
       );
+
+      // ページ内の相対パスは末尾の "/" を前提にしているため、
+      // 実体があるディレクトリは /docs/ へ寄せる。
+      if (response.ok && !url.pathname.endsWith("/")) {
+        return Response.redirect(`${url.origin}${url.pathname}/${url.search}`, 301);
+      }
     }
 
     if (response.status === 404 && !url.pathname.includes(".")) {

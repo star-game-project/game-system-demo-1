@@ -7,21 +7,21 @@ import {
   GAME_CONFIG,
   PHASE_LABELS,
   PHASES,
-} from "/src/data/constants.js";
+} from "../src/data/constants.js";
 import {
   CARD_CATALOGUE,
   CARD_BY_KEY,
   DEFAULT_DECK_COUNTS,
-} from "/src/data/cards.js";
-import { BONUS_ROLES, PENALTY_ROLES, ROLE_FAMILIES } from "/src/data/roles.js";
-import { summarizeDeck, bucketLimit } from "/src/game/deckBuilder.js";
+} from "../src/data/cards.js";
+import { BONUS_ROLES, PENALTY_ROLES, ROLE_FAMILIES } from "../src/data/roles.js";
+import { summarizeDeck, bucketLimit } from "../src/game/deckBuilder.js";
 import {
   TACTICAL_ABILITIES,
   isAreaAttackCard,
   isDefenseCard,
   isTacticalCard,
   isWildCard,
-} from "/src/game/abilityLogic.js";
+} from "../src/game/abilityLogic.js";
 
 const DIE_FACES = ["", "⚀", "⚁", "⚂", "⚃", "⚄", "⚅"];
 

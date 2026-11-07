@@ -52,7 +52,7 @@
       <ul>
         <li><b>DECK CONSTRUCTION</b> — カード一覧から初期デッキ（6〜20枚）を構築する（3章）</li>
         <li><b>BATTLE</b> — 構築したデッキで敵と戦う（5〜10章）</li>
-        <li><b>REWARD</b> — 勝利後、カードの入手・削除と役の強化を行う（11.2・11.3）</li>
+        <li><b>REWARD</b> — 勝利後、カードの入手・削除、役の強化、アイテムの入手を行う（11.2〜11.4）</li>
       </ul>
       <p>戦闘は必ずデッキ構築から始まる。構築画面では最初に、どのルールで遊ぶかを選ぶ（3.5）。戦闘中はいつでも構築画面に戻れる（デッキ内容は保持される）。</p>
       <aside class="docs-callout docs-callout--demo" data-summary="構築画面は本番では置かない。本文の「構築画面」はタイトル画面と読み替える">
@@ -184,6 +184,7 @@ runColors = { pierce_1: ["yellow"], blade_3: ["yellow", "yellow"], … }</code><
       <h3>5.2 1ターンの進行</h3>
       <pre><code>1. ドロー選択      DRAW（1ポイント）または SKIP
 2. カード使用      攻撃・防御・戦術カードを、ポイントが続く限り何枚でも使う
+                   アイテムもこの段階でいつでも使える（ポイント不要。11.4）
                    （どのカードもターンを終了しない。1枚使うごとに残りの手札で役を判定し直す）
 3. END TURN        プレイヤーが自分でターンを終了する（いつでも押せる）
 4. 敵の行動        生き残っている敵が先頭から順に行動。シールドは順に削られる
@@ -449,7 +450,7 @@ target.hp    -= dealt</code></pre>
       <h3>11.1 連戦</h3>
       <p>勝利すると <b>REWARD</b> で報酬画面（11.2）に進み、そこから <b>NEXT BATTLE</b> で次の戦闘に進む。何戦目かと今のデッキ枚数は画面上部に <code>BATTLE #002 DECK 9</code> のように表示する（表示の仕方はUI班と調整する。1.2）。</p>
       <ul>
-        <li><b>引き継ぐもの</b>：プレイヤーの残りHP（回復しない）、報酬で入手・削除したデッキ、役の強化レベル（11.3）、ポイントの設定（6.1。カードに使うポイントの初期値・最大値・回復量）、ルール（3.5）</li>
+        <li><b>引き継ぐもの</b>：プレイヤーの残りHP（回復しない）、報酬で入手・削除したデッキ、役の強化レベル（11.3）、ポイントの設定（6.1。カードに使うポイントの初期値・最大値・回復量）、ルール（3.5）、残っているアイテム（11.4）</li>
         <li><b>リセットするもの</b>：山札（その時点のデッキから作り直してシャッフル）・ポイント・シールド・ターン数・敵（HP・行動パターンの位置・溜め込み・ブロック）・攻撃の対象</li>
         <li>敵は毎戦同じ（2体・HP・行動パターンとも変わらない）</li>
       </ul>
@@ -499,6 +500,21 @@ target.hp    -= dealt</code></pre>
         <span class="docs-tag docs-tag--open">検討中</span>
         <p>強化は当面足し算にしているが、今後のバランス次第では掛け算（例：1レベルごとに5%増）にする可能性がある。</p>
       </aside>
+
+      <h3>11.4 アイテム</h3>
+      <p>バトル中に使える使い切りの道具。カードとは別に持ち、山札には入らない。</p>
+      <div class="docs-table-wrap"><table id="items-table"></table></div>
+      <ul>
+        <li><b>使い方</b>：自分のターンの、カードを使う段階（DRAW / SKIP を選んだあと）でいつでも使える。<b>ポイントは不要</b>で、ターンも終了しない。使うとなくなる。</li>
+        <li><b>入手</b>：戦闘後の報酬画面で、候補<span id="item-offer-count"></span>つから<span id="item-gain-count"></span>つまで選んで入手する（任意）。</li>
+        <li><b>持てる数</b>：<span id="item-max-held"></span>つまで。上限に達しているときは入手できない。同じアイテムを複数持てる。</li>
+        <li>残ったアイテムは次の戦闘に持ち越し、1戦目からやり直すと空に戻る。どちらのルール（3.5）でも同じように使える。</li>
+        <li>意味のない使い方はできない（HPが満タンのときの回復など）。</li>
+      </ul>
+      <aside class="docs-callout docs-callout--open" data-summary="HPの回復手段の役割分担（アイテム・回復スポット・HP回復カード）">
+        <span class="docs-tag docs-tag--open">検討中</span>
+        <p>HPを回復する手段として、アイテム（Heal Potion）、戦闘以外の局面の回復スポット（1.1）、先送りにしている HP回復カードがある。どれをどう使い分けるかは未定。</p>
+      </aside>
     </section>
 
     <section id="state">
@@ -515,6 +531,7 @@ target.hp    -= dealt</code></pre>
     hp: number; maxHp: number;
     point: number; maxPoint: number;
     deck: Card[]; hand: Card[]; discardPile: Card[];
+    items: string[];              // 持っているアイテムの id（並び順＝表示順。連戦中に持ち越す）
     cardsPlayed: number;          // 実際に使用した枚数（捨て札枚数とは別）
     temporaryEffects: TemporaryEffect[];
   };
@@ -551,6 +568,7 @@ target.hp    -= dealt</code></pre>
     roles.js          役の定義
     enemies.js        敵の構成と行動パターン
     diceColors.js     ダイスの色（「ダイスの色（試作）」）
+    items.js          アイテムの一覧と、持てる数・報酬での出し方
 
   game/
     gameState.js      初期状態の生成
@@ -563,6 +581,7 @@ target.hp    -= dealt</code></pre>
     enemyLogic.js     敵の行動予告・行動パターンの進行・敵の与ダメージ
     pointRules.js     ポイントの設定（範囲の正規化・プリセット・回復）
     rulesets.js       遊び比べるルールの一覧と選択
+    itemLogic.js      アイテムの使用可否・効果・報酬での入手
     colorLogic.js     ダイスの色の決め方と、報酬での入手・削除の反映
     rewardLogic.js    報酬の候補（カード・役）と、入手・削除・強化の確定
 

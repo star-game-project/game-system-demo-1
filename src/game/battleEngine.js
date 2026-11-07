@@ -5,6 +5,8 @@ import { calculateAttack } from "./damageLogic.js";
 import { advanceCpuAction, aliveEnemies, cpuActionDamage, getCpuIntent } from "./enemyLogic.js";
 import { createTurnTotals } from "./gameState.js";
 import { recoverPoints } from "./pointRules.js";
+import { ITEM_BY_ID } from "../data/items.js";
+import { canUseItem, healPlayer } from "./itemLogic.js";
 import {
   createTemporaryEffects,
   isAreaAttackCard,
@@ -399,6 +401,30 @@ export class BattleEngine {
       : "";
     this.state.battleMessage = `ポイント +${recovered}。手札${discarded.length}枚を捨て、${refill.drawn.length}枚を引き直しました。${recycleNote}ターン ${this.state.turn} を開始します。`;
     return true;
+  }
+
+  /** 持っているアイテムのうち、slot 番目をいま使えるか。 */
+  canUseItemAt(slot) {
+    if (this.state.phase !== PHASES.CARD_SELECT) return false;
+    const item = ITEM_BY_ID[this.state.player.items[slot]];
+    return canUseItem(item, this.state.player);
+  }
+
+  /**
+   * slot 番目のアイテムを使う。ポイント不要・使い切りで、ターンは終了しない。
+   * 使えなければ null を返す。
+   */
+  useItem(slot) {
+    if (!this.canUseItemAt(slot)) return null;
+    const { player } = this.state;
+    const item = ITEM_BY_ID[player.items[slot]];
+    player.items = player.items.filter((_, index) => index !== slot);
+
+    if (item.effect.type === "HEAL") {
+      const healed = healPlayer(player, item.effect.value);
+      this.state.battleMessage = `${item.name} — HPを${healed}回復しました（${player.hp} / ${player.maxHp}）。`;
+    }
+    return { item };
   }
 
   /** カードを使い終えたらプレイヤーが自分でターンを終了する。いつでも終了できる。 */

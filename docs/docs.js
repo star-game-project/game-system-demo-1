@@ -16,6 +16,7 @@ import {
 import { BONUS_ROLES, COLOR_ROLES, PENALTY_ROLES, ROLE_FAMILIES } from "../src/data/roles.js";
 import { summarizeDeck, bucketLimit } from "../src/game/deckBuilder.js";
 import { DEFAULT_RULESET_ID, RULESETS } from "../src/game/rulesets.js";
+import { ITEMS, ITEM_RULES } from "../src/data/items.js";
 import {
   TACTICAL_ABILITIES,
   isAreaAttackCard,
@@ -302,6 +303,21 @@ table(
     COLOR_ROLE_FREQUENCY[role.id] ?? "—",
   ]),
 );
+
+// ---- 11.4 アイテム ----
+table(
+  document.querySelector("#items-table"),
+  ["アイテム", "効果", "type"],
+  ITEMS.map((item) => [`<b>${item.name}</b>`, item.description, `<code>${item.effect.type}</code>`]),
+);
+for (const [id, value] of [
+  ["#item-max-held", ITEM_RULES.MAX_HELD],
+  ["#item-offer-count", ITEM_RULES.OFFER_COUNT],
+  ["#item-gain-count", ITEM_RULES.MAX_GAINS],
+]) {
+  const element = document.querySelector(id);
+  if (element) element.textContent = `${value}`;
+}
 
 // ---- 3.5 ルールの選択 ----
 table(

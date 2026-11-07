@@ -48,6 +48,8 @@ import {
   normalizeRulesetId,
 } from "./game/rulesets.js";
 import { DICE_COLOR_BY_ID } from "./data/diceColors.js";
+import { ITEM_BY_ID, ITEM_RULES } from "./data/items.js";
+import { applyItemReward, canGainItem, drawItemOffers } from "./game/itemLogic.js";
 import { applyRewardColors, rollDiceColor, rollRunColors } from "./game/colorLogic.js";
 import {
   applyReward,
@@ -77,13 +79,16 @@ let runCounts = null;
 let runRoleLevels = {};
 // 連戦中のデッキの色（{ cardKey: [1枚目の色, …] }）。「ダイスの色（試作）」のときだけ持ち、現行ルールでは null。
 let runColors = null;
-// 報酬画面の状態：{ offers, gainKey, removeKey, roleOffers, roleKey, battle, playerHp }
+// 連戦中に持っているアイテム（id の配列）。戦闘中に使うと減り、報酬で増える。1戦目からやり直すと空に戻る。
+let runItems = [];
+// 報酬画面の状態：{ offers, gainKey, removeKey, roleOffers, roleKey, itemOffers, itemKey, battle, playerHp }
 let reward = null;
 
 /** 構築画面のデッキで、1戦目から連戦を始める。 */
 function startRun() {
   runCounts = { ...deckCounts };
   runRoleLevels = {};
+  runItems = [];
   // 色は連戦を始めるときに1枚ずつ決め、連戦中は変わらない。
   runColors = ruleset === "dice_color" ? rollRunColors(runCounts) : null;
   startBattle();
@@ -99,6 +104,7 @@ function startBattle(carry = {}) {
       pointRules,
       ruleset,
       roleLevels: runRoleLevels,
+      items: runItems,
       ...carry,
     }),
   );
@@ -107,6 +113,8 @@ function startBattle(carry = {}) {
 
 function openReward() {
   const { state } = engine;
+  // 戦闘中に使った分を反映して、残っているアイテムを持ち越す。
+  runItems = [...state.player.items];
   const offers = drawRewardOffers();
   reward = {
     offers,
@@ -117,6 +125,8 @@ function openReward() {
     // 色があるときは、同じカードでも色ごとに別の1枚として削除を選ぶ。
     removeIndex: null,
     roleOffers: drawRoleOffers(Math.random, REWARD_RULES.ROLE_OFFER_COUNT, state.ruleset),
+    itemOffers: drawItemOffers(),
+    itemKey: null,
     roleKey: null,
     battle: state.battle,
     playerHp: state.player.hp,
@@ -379,6 +389,25 @@ function renderPreview(state) {
       </div>
       <button class="command-button command-button--secondary role-guide" data-action="show-roles">ROLE LIST（役一覧）</button>
     </aside>
+  `;
+}
+
+function renderItems(state) {
+  const { items } = state.player;
+  const slots = items.map((id, slot) => {
+    const item = ITEM_BY_ID[id];
+    const usable = engine.canUseItemAt(slot);
+    return `
+      <button class="item-slot" data-use-item="${slot}" ${usable ? "" : "disabled"} title="${item.description}">
+        <strong>${item.name}</strong><small>${item.description}</small>
+      </button>
+    `;
+  }).join("");
+  return `
+    <div class="item-bar">
+      <span class="resource-label">ITEMS ${items.length} / ${ITEM_RULES.MAX_HELD}</span>
+      ${items.length ? `<div class="item-bar__slots">${slots}</div>` : `<small class="item-bar__empty">アイテムなし（戦闘後の報酬で手に入る）</small>`}
+    </div>
   `;
 }
 
@@ -813,6 +842,25 @@ function renderReward() {
     })];
   }).join("");
 
+  const { itemOffers, itemKey } = reward;
+  const itemFull = !canGainItem(runItems);
+  const itemCards = itemOffers.map((id) => {
+    const item = ITEM_BY_ID[id];
+    const selected = itemKey === id;
+    return `
+      <article class="catalogue-card ${selected ? "is-included reward-card--selected" : ""}">
+        <header>
+          <span class="catalogue-card__die">✚</span>
+          <div><strong>${item.name}</strong><small>ITEM / ポイント不要・使い切り</small></div>
+        </header>
+        <span class="ability ability--none">${item.description}</span>
+        <button type="button" class="command-button command-button--secondary" data-reward-item="${id}" ${itemFull && !selected ? "disabled" : ""}>${selected ? "選択中（もう一度で解除）" : itemFull ? `所持数が上限（${ITEM_RULES.MAX_HELD}）のため不可` : "これを入手"}</button>
+      </article>
+    `;
+  }).join("");
+  const heldItems = runItems.length ? runItems.map((id) => ITEM_BY_ID[id].name).join("、") : "なし";
+  const itemText = itemKey ? `${ITEM_BY_ID[itemKey].name} を入手` : "アイテムなし";
+
   const { roleOffers, roleKey } = reward;
   const roleCards = roleOffers.map((id) => {
     const role = ROLE_BY_ID[id];
@@ -849,12 +897,12 @@ function renderReward() {
         </a>
         <div class="topbar__center"><span>CLEARED</span><strong>#${String(battle).padStart(3, "0")}</strong></div>
         <button class="command-button command-button--primary" data-action="next-battle">
-          <span>NEXT BATTLE</span><small>${gainText} / ${removeText} / ${roleText}</small>
+          <span>NEXT BATTLE</span><small>${gainText} / ${removeText} / ${roleText} / ${itemText}</small>
         </button>
       </header>
 
       <section class="point-rules">
-        <div><span class="eyebrow">RUN STATUS</span><strong>HP ${playerHp} / ${GAME_CONFIG.PLAYER_MAX_HP}（回復なし） · デッキ ${countCards(runCounts)}枚 → ${countCards(result)}枚</strong></div>
+        <div><span class="eyebrow">RUN STATUS</span><strong>HP ${playerHp} / ${GAME_CONFIG.PLAYER_MAX_HP}（回復なし） · デッキ ${countCards(runCounts)}枚 → ${countCards(result)}枚 · アイテム ${runItems.length} / ${ITEM_RULES.MAX_HELD}（${heldItems}）</strong></div>
         <small>候補${REWARD_RULES.OFFER_COUNT}枚から${REWARD_RULES.MAX_GAINS}枚まで入手し、デッキから${REWARD_RULES.MAX_REMOVALS}枚まで削除し、候補${REWARD_RULES.ROLE_OFFER_COUNT}つの役から${REWARD_RULES.MAX_ROLE_UPGRADES}つまで強化できます（いずれも任意）。削除は${DECK_RULES.MIN_DECK_SIZE}枚を下回らない範囲で行えます。</small>
       </section>
 
@@ -866,6 +914,11 @@ function renderReward() {
       <section class="catalogue">
         <div class="build-heading"><div><span class="eyebrow">REMOVE</span><h2>今のデッキ（1枚まで削除）</h2></div></div>
         <div class="catalogue-grid">${deckCards}</div>
+      </section>
+
+      <section class="catalogue">
+        <div class="build-heading"><div><span class="eyebrow">ITEM</span><h2>入手するアイテム（${ITEM_RULES.MAX_GAINS}つまで・持てるのは${ITEM_RULES.MAX_HELD}つまで）</h2></div></div>
+        <div class="catalogue-grid">${itemCards}</div>
       </section>
 
       <section class="catalogue">
@@ -984,6 +1037,7 @@ function render() {
           <div class="player-zone">
             ${statusPanel(state.player, "PLAYER // DICER", "player")}
             ${renderPoints(state)}
+            ${renderItems(state)}
           </div>
         </div>
         ${renderPreview(state)}
@@ -1120,6 +1174,20 @@ function bindEvents() {
     });
   });
 
+  app.querySelectorAll("[data-reward-item]").forEach((button) => {
+    button.addEventListener("click", () => {
+      const id = button.dataset.rewardItem;
+      reward.itemKey = reward.itemKey === id ? null : id;
+      render();
+    });
+  });
+
+  app.querySelectorAll("[data-use-item]").forEach((button) => {
+    button.addEventListener("click", () => {
+      if (engine.useItem(Number(button.dataset.useItem))) render();
+    });
+  });
+
   app.querySelectorAll("[data-reward-role]").forEach((button) => {
     button.addEventListener("click", () => {
       const id = button.dataset.rewardRole;
@@ -1212,6 +1280,7 @@ function bindEvents() {
         }
         runCounts = applyReward(runCounts, reward.offers, reward);
         runRoleLevels = applyRoleUpgrade(runRoleLevels, reward.roleOffers, reward.roleKey);
+        runItems = applyItemReward(runItems, reward.itemOffers, reward.itemKey);
         startBattle({ battle: reward.battle + 1, playerHp: reward.playerHp });
         render();
       }

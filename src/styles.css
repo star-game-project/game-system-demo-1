@@ -1865,3 +1865,39 @@ a:focus-visible {
 .battle-card.dice-accent--blue, .catalogue-card.dice-accent--blue { --card-accent: #5ea8ff; }
 .battle-card.dice-accent--green, .catalogue-card.dice-accent--green { --card-accent: #5fd38f; }
 .battle-card.dice-accent--yellow, .catalogue-card.dice-accent--yellow { --card-accent: #ffd34d; }
+
+/* ---------- アイテム ---------- */
+
+.item-bar {
+  display: grid;
+  gap: 6px;
+  margin-top: 10px;
+}
+
+.item-bar__slots {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.item-bar__empty {
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.item-slot {
+  display: grid;
+  gap: 2px;
+  text-align: left;
+  padding: 6px 10px;
+  font: inherit;
+  color: var(--text);
+  background: color-mix(in srgb, var(--lime) 7%, transparent);
+  border: 1px solid color-mix(in srgb, var(--lime) 45%, transparent);
+  cursor: pointer;
+}
+
+.item-slot strong { font-size: 12px; }
+.item-slot small { font-size: 10px; color: var(--muted); }
+.item-slot:not(:disabled):hover { border-color: var(--lime); }
+.item-slot:disabled { opacity: 0.45; cursor: default; }

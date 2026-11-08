@@ -15,7 +15,7 @@ export function isTacticalCard(card) {
   return Boolean(card?.tacticalAbility);
 }
 
-/** 攻撃の代わりにシールドを得る防御カードか。攻撃と同じくターンを終了する。 */
+/** 攻撃の代わりにシールドを得る防御カードか。攻撃と同じくターンは終了しない。 */
 export function isDefenseCard(card) {
   return (card?.defense ?? 0) > 0;
 }

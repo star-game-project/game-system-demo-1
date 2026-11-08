@@ -196,7 +196,7 @@ function abilityLabel(card) {
     return `<span class="ability ability--tactical"><i>◆</i> ${tacticalLabel(card.tacticalAbility)}</span>`;
   }
   if (isDefenseCard(card)) {
-    return `<span class="ability ability--support"><i>◇</i> SHIELD +${card.defense} / ENDS TURN / NO ROLE ×</span>`;
+    return `<span class="ability ability--support"><i>◇</i> SHIELD +${card.defense} / NO ROLE ×</span>`;
   }
   if (isWildCard(card)) {
     return `<span class="ability ability--wild"><i>◈</i> WILD DIE</span>`;

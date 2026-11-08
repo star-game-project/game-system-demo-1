@@ -90,7 +90,7 @@ export class BattleEngine {
     if (card.cost > this.state.player.point) return false;
     this.state.selectedCardId = card.id;
     this.state.battleMessage = isDefenseCard(card)
-      ? `${card.name} を選択中。シールド +${card.defense} を得てターンを終了します。`
+      ? `${card.name} を選択中。シールド +${card.defense} を得ます（役の倍率は掛かりません）。`
       : `${card.name} を選択中。攻撃内容を確認してください。`;
     return true;
   }

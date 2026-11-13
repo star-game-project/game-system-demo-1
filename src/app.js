@@ -113,7 +113,8 @@ function startRun() {
   runRoleLevels = {};
   runItems = itemsFromCounts(startItemCounts);
   // 色は連戦を始めるときに1枚ずつ決め、連戦中は変わらない。
-  runColors = hasRule(ruleset, "dice_color") ? rollRunColors(runCounts) : null;
+  // 「目と色を振る（試作）」も ON なら、色はカードに固定せず手札に来るたびに振るので持たない。
+  runColors = hasRule(ruleset, "dice_color") && !hasRule(ruleset, "roll_dice") ? rollRunColors(runCounts) : null;
   startBattle();
 }
 
@@ -847,11 +848,15 @@ function renderRulesetPicker() {
       </div>
     `
     : "";
+  const rollNote = hasRule(ruleset, "roll_dice")
+    ? `<p class="ruleset-picker__note">目${hasRule(ruleset, "dice_color") ? "と色" : ""}は手札に来るたびに振るので、カードに書かれた目${hasRule(ruleset, "dice_color") ? "・色" : ""}は使われない（構築画面の目の上限は今のまま）。</p>`
+    : "";
   return `
     <section class="ruleset-picker">
       <div><span class="eyebrow">RULES</span><strong>どのルールで遊ぶか：${rulesetLabel(ruleset)}</strong><small>試作ルールはそれぞれ ON / OFF でき、組み合わせて遊べる。</small></div>
       <div class="ruleset-picker__options">${options}</div>
       ${handSizes}
+      ${rollNote}
     </section>
   `;
 }

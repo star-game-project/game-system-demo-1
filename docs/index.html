@@ -136,7 +136,7 @@
         <li><b>初期デッキ</b>：連戦を始めるときに、1枚ずつ等確率で色を決める。</li>
         <li><b>入手</b>：報酬の候補には、あらかじめ色が付いて表示される。入手するとその色でデッキに加わる。</li>
         <li><b>削除</b>：同じカードでも色ごとに別の1枚として並び、どの色の1枚を削除するかを選べる。</li>
-        <li>色は連戦中に変わらない。Wild Die がワイルドなのは目だけで、色は普通に1色を持つ。</li>
+        <li>色は連戦中に変わらない（「目と色を振る（試作）」も ON のときは、手札に来るたびに振る。3.8）。Wild Die がワイルドなのは目だけで、色は普通に1色を持つ。</li>
         <li>色があるときは、カードを目ごとの色分けではなく<b>ダイスの色で塗り</b>、色の名前も表示する。</li>
       </ul>
       <pre><code>// 連戦中の色の持ち方。i 番目の色が、そのカードの i 枚目（id は `${key}_${i + 1}`）の色
@@ -145,6 +145,21 @@ runColors = { pierce_1: ["yellow"], blade_3: ["yellow", "yellow"], … }</code><
 
       <h3>3.7 持ち込みアイテム</h3>
       <p>構築画面の <b>STARTING ITEMS</b> で、連戦の最初に持つアイテム（11.4）を選ぶ。合計は持てる数（<span id="start-item-max"></span>つ）まで。1戦目からやり直すと、ここで選んだアイテムに戻る。既定は持ち込みなし。</p>
+
+      <h3>3.8 目と色を振る（「目と色を振る（試作）」のときだけ）</h3>
+      <p>カードの<b>目はカードに固定されず、手札に来るたびにダイスを振って決める</b>（1〜6を等確率）。「ダイスの色（試作）」も ON なら、<b>色も手札に来るたびに振る</b>（4色を等確率）。ほかの試作ルールと組み合わせられる（3.5）。</p>
+      <ul>
+        <li>振るのは、ターン開始の引き直し・DRAW・Recycle など、<b>カードが手札に来たとき</b>すべて。同じカードでも手札に来るたびに目・色が変わる。</li>
+        <li>攻撃力・コスト・能力はカードのまま。目と色だけが変わる。</li>
+        <li>Wild Die は目を振らない（どの目としても扱われるため）。色は振る。</li>
+        <li>Tune Up などで変えた目は、振った目からの変化として表示する。</li>
+        <li>色を振るときは、連戦中の固定の色（3.6 の <code>runColors</code>）を持たない。報酬の候補にも色は付かず、削除も色ごとに分けない。</li>
+        <li>構築画面の目の上限（3.1）は今のまま掛かるが、カードに書かれた目は役に使われない。</li>
+      </ul>
+      <aside class="docs-callout docs-callout--open" data-summary="目と色をカードに固定せず、手札に来るたびに振る案（目と色を振る）">
+        <span class="docs-tag docs-tag--open">検討中</span>
+        <p>目と色をカードに固定せず、手札に来るたびに振る案を試作している。デッキ構築で目や色を寄せる考え方がなくなる代わりに、毎ターンの運の要素が増える。採用する場合は、目の上限などデッキ構築の制約や、目・色を変える手段（戦術カード・成長）の役割を見直す必要がある。</p>
+      </aside>
     </section>
 
     <section id="cards">
@@ -592,7 +607,7 @@ target.hp    -= dealt</code></pre>
       <h2>12. 状態</h2>
       <pre><code>type GameState = {
   battle: number;               // 連戦の何戦目か（1始まり）
-  ruleset: string; // 構築画面で選んだルール（3.5）。"standard" か、ON にした試作ルールを "+" でつないだもの（"dice_color" / "select_play" / "dice_color+select_play"）
+  ruleset: string; // 構築画面で選んだルール（3.5）。"standard" か、ON にした試作ルールを "+" でつないだもの（"dice_color" / "select_play" / "roll_dice" / "dice_color+roll_dice" など）
   playedCards: { card, targetId, attack }[]; // 「選んで出す（試作）」で場に出したカード（出した順。ターン終了時に処理。7.7）
   pointRules: { startPoint: number; maxPoint: number; recovery: number; fullRefill: boolean };
   roleLevels: { [family: string]: number }; // 系統ごとの強化レベル（例：{ set: 2 }。連戦中に引き継ぐ）

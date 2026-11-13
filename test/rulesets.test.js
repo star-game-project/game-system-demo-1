@@ -11,13 +11,13 @@ import {
   rulesetLabel,
 } from "../src/game/rulesets.js";
 
-test("the current rules and both prototypes are selectable", () => {
+test("the current rules and every prototype are selectable", () => {
   assert.deepEqual(
     RULESETS.map((ruleset) => ruleset.id),
-    ["standard", "dice_color", "select_play"],
+    ["standard", "dice_color", "select_play", "roll_dice"],
   );
   assert.equal(DEFAULT_RULESET_ID, "standard");
-  assert.deepEqual(RULE_OPTIONS.map((option) => option.id), ["dice_color", "select_play"]);
+  assert.deepEqual(RULE_OPTIONS.map((option) => option.id), ["dice_color", "select_play", "roll_dice"]);
 });
 
 test("a battle starts on the current rules unless another is chosen", () => {

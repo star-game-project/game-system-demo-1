@@ -6,6 +6,7 @@ import { advanceCpuAction, aliveEnemies, cpuActionDamage, getCpuIntent } from ".
 import { createTurnTotals } from "./gameState.js";
 import { recoverPoints } from "./pointRules.js";
 import { hasRule, turnStartPhase } from "./rulesets.js";
+import { rollFacesOnDraw } from "./diceRollLogic.js";
 import { ITEM_BY_ID } from "../data/items.js";
 import { canUseItem, healPlayer } from "./itemLogic.js";
 import {
@@ -186,6 +187,8 @@ export class BattleEngine {
     );
     player.deck = result.deck;
     player.discardPile = result.discardPile;
+    // 「目と色を振る（試作）」では、手札に来たときに目（と色）を振る。
+    result.drawn = rollFacesOnDraw(result.drawn, this.state.ruleset, this.random);
     player.hand.push(...result.drawn);
     return result;
   }

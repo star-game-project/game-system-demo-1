@@ -4,6 +4,7 @@ import { createEnemies } from "../data/enemies.js";
 import { drawCards, shuffleDeck } from "./deckLogic.js";
 import { evaluateHandRole } from "./roleLogic.js";
 import { DEFAULT_POINT_RULES, normalizePointRules } from "./pointRules.js";
+import { rollFacesOnDraw } from "./diceRollLogic.js";
 import { DEFAULT_RULESET_ID, handSizeFor, hasRule, normalizeRulesetId, turnStartPhase } from "./rulesets.js";
 
 /** 1ターン中に使ったカードの合計。ターン開始時に作り直す。 */
@@ -36,6 +37,8 @@ export function createInitialGameState(
   const rules = normalizePointRules(pointRules);
   const shuffled = shuffleDeck(deckCards ?? createDemoDeck(), random);
   const openingDraw = drawCards(shuffled, size);
+  // 「目と色を振る（試作）」では、最初の手札の目（と色）もここで振る。
+  openingDraw.drawn = rollFacesOnDraw(openingDraw.drawn, rulesetId, random);
 
   return {
     battle,

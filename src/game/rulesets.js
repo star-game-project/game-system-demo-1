@@ -28,6 +28,12 @@ export const RULE_OPTIONS = Object.freeze([
     description:
       "カードは1枚ずつ対象を選んで場に出し、ターン終了時にまとめて処理する。役は場に出したカードだけで判定し、その倍率を場のすべての攻撃に掛ける。",
   }),
+  Object.freeze({
+    id: "roll_dice",
+    label: "目と色を振る（試作）",
+    description:
+      "カードの目（「ダイスの色」も ON なら色も）はカードに固定されず、手札に来るたびにランダムに振る。",
+  }),
 ]);
 
 /** 現行ルールと、組み合わせの元になる試作ルール（仕様書の一覧用）。 */
@@ -52,7 +58,7 @@ export function normalizeRulesetId(id) {
   return rulesetIdFrom(ruleOptionsOf(id));
 }
 
-/** そのルールに試作ルール optionId（"dice_color" / "select_play"）が入っているか。 */
+/** そのルールに試作ルール optionId（"dice_color" / "select_play" / "roll_dice"）が入っているか。 */
 export function hasRule(rulesetId, optionId) {
   return ruleOptionsOf(rulesetId).includes(optionId);
 }

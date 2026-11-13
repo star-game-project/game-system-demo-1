@@ -346,7 +346,52 @@ function renderCenter(state) {
   `;
 }
 
+/** 「選んで出す（試作）」の右の欄：選んだカードをまとめて出したときの結果。 */
+function renderGroupPreview(state) {
+  const preview = engine.getGroupPreview();
+  const role = preview ?? state.currentRole;
+  const multiplier = preview?.roleMultiplier ?? role?.multiplier ?? 1;
+  const hitsText = preview?.hits.length
+    ? preview.hits.map((hit) => `${hit.enemyName} ${hit.dealt}`).join(" / ")
+    : "—";
+  return `
+    <aside class="tactical-panel">
+      <div class="panel-heading">
+        <span class="eyebrow">TACTICAL SCAN</span>
+        <span class="panel-heading__status">LIVE</span>
+      </div>
+      <div class="preview-card ${preview ? "preview-card--active" : ""}">
+        <div class="preview-card__top">
+          <div>
+            <span class="preview-label">SELECTED CARDS ${preview ? `${preview.cards.length}枚 · COST ${preview.cost}` : ""}</span>
+            <h3>${preview ? preview.cards.map((card) => card.name).join("・") : "出すカードを選択"}</h3>
+          </div>
+        </div>
+        <dl class="damage-formula">
+          <div><dt>BASE ATTACK（合計）</dt><dd>${preview?.baseAttack ?? "—"}</dd></div>
+          <div class="${preview?.bonus ? "is-positive" : ""}"><dt>PASSIVE + TURN BUFF</dt><dd>${preview ? `+${preview.bonus}` : "—"}</dd></div>
+        </dl>
+        <div class="formula-divider"><span>×</span></div>
+        <div class="role-formula">
+          <span class="preview-label">ROLE（選んだカード）</span>
+          <div><strong>${roleNameLabel(preview ?? role) || "NONE"}</strong><b>${multiplierLabel(multiplier)}</b></div>
+          ${roleBreakdown(preview ?? role) ? `<small class="role-breakdown">${roleBreakdown(preview ?? role)}</small>` : ""}
+        </div>
+        <div class="final-damage"><span>FINAL DAMAGE</span><strong>${preview?.hits.length ? preview.finalAttack : "—"}</strong></div>
+        <dl class="damage-formula">
+          <div><dt>TARGET</dt><dd>${preview?.hasArea ? "ALL（全体攻撃を含む）" : engine.getTargetEnemy()?.name ?? "—"}</dd></div>
+          <div><dt>DEALT</dt><dd>${hitsText}</dd></div>
+          <div class="${preview?.shield ? "is-positive" : ""}"><dt>SHIELD（倍率なし）</dt><dd>${preview ? `+${preview.shield}` : "—"}</dd></div>
+        </dl>
+        <p class="preview-hint">出すカードを選ぶと、選んだカードだけで役を判定します。攻撃力は合計して倍率を掛け、防御値は合計してシールドにします。出すとターンが終わります。</p>
+      </div>
+      <button class="command-button command-button--secondary role-guide" data-action="show-roles">ROLE LIST（役一覧）</button>
+    </aside>
+  `;
+}
+
 function renderPreview(state) {
+  if (engine.isSelectPlay()) return renderGroupPreview(state);
   const selected = engine.getSelectedCard();
   const preview = selected ? engine.getAttackPreview(selected.id) : null;
   const role = preview
@@ -472,8 +517,12 @@ function renderHand(state) {
       const tactical = isTacticalCard(card);
       const defense = isDefenseCard(card);
       const preview = tactical || defense ? null : engine.getAttackPreview(card.id);
-      const selected = card.id === state.selectedCardId;
-      const unaffordable = card.cost > state.player.point;
+      // 「選んで出す（試作）」では複数枚を選べる。選べないカード（ポイント不足）は押せない。
+      const selectPlay = engine.isSelectPlay();
+      const selected = selectPlay ? state.selectedCardIds.includes(card.id) : card.id === state.selectedCardId;
+      const unaffordable = selectPlay && !tactical
+        ? !engine.canToggleSelection(card.id)
+        : card.cost > state.player.point;
       const isSource = targeting && card.id === pendingTactical.cardId;
       const isTarget = targeting && pendingTactical.targets.includes(card.id);
       const interactive = targeting
@@ -567,6 +616,21 @@ function renderCommands(state) {
       </div>
       <div class="command-actions">
         <button class="command-button command-button--secondary" data-action="cancel-tactical">CANCEL</button>
+      </div>
+    `;
+  }
+
+  if (state.phase === PHASES.CARD_SELECT && engine.isSelectPlay()) {
+    const count = state.selectedCardIds.length;
+    const role = state.currentRole;
+    return `
+      <div class="command-copy">
+        <span class="command-step">02 / 02</span>
+        <div><strong>${count ? `${count}枚を出す（コスト ${engine.getSelectedCost()} / ポイント ${state.player.point}）` : "出すカードを選択"}</strong><small>${count ? `役：${roleNameLabel(role) || "なし"} ${multiplierLabel(role?.multiplier ?? 1)} — 出すとターンが終わります` : "攻撃・防御カードを押して選ぶ（もう一度で外す）。戦術カードとアイテムは先に使えます"}</small></div>
+      </div>
+      <div class="command-actions">
+        <button class="command-button command-button--danger" data-action="end-turn">END TURN</button>
+        <button class="command-button command-button--attack" data-action="play-group" ${count ? "" : "disabled"}><span>PLAY</span><small>${count}枚を出す</small></button>
       </div>
     `;
   }
@@ -719,7 +783,7 @@ function renderRoleTable(levels = {}, rulesetId = ruleset) {
 }
 
 function roleRuleHint(rulesetId = ruleset) {
-  const basis = rulesetId === "dice_color" ? "手札全体の目と色" : "手札全体の目";
+  const basis = rulesetId === "dice_color" ? "手札全体の目と色" : rulesetId === "select_play" ? "出したカードの目" : "手札全体の目";
   return `${basis}で役が決まります。役は系統ごとにまとめてあり、強い段階が成立するほど同じ名前のまま倍率が上がります。系統ごとに最も高い段階を1つ採り、系統をまたいで倍率を掛け合わせます。`;
 }
 
@@ -1102,7 +1166,7 @@ function render() {
       <section class="hand-section">
         <div class="hand-heading">
           <div><span class="eyebrow">YOUR ARSENAL</span><h2>HAND <b>${state.player.hand.length}</b></h2></div>
-          <div class="hand-role"><span>CURRENT ROLE${state.lockedRole ? "（固定中）" : ""}</span><strong>${roleNameLabel(state.currentRole) || "NONE"}</strong><b>${multiplierLabel(state.currentRole?.multiplier ?? 1)}</b></div>
+          <div class="hand-role"><span>${engine.isSelectPlay() ? "SELECTED ROLE" : "CURRENT ROLE"}${state.lockedRole ? "（固定中）" : ""}</span><strong>${roleNameLabel(state.currentRole) || "NONE"}</strong><b>${multiplierLabel(state.currentRole?.multiplier ?? 1)}</b></div>
         </div>
         <div class="hand-track">${renderHand(state)}</div>
       </section>
@@ -1162,7 +1226,12 @@ function handleCardClick(cardId) {
   }
 
   const card = state.player.hand.find((item) => item.id === cardId);
-  if (!card || card.cost > state.player.point) return;
+  if (!card) return;
+  if (engine.isSelectPlay() && !isTacticalCard(card)) {
+    if (engine.toggleSelection(cardId)) render();
+    return;
+  }
+  if (card.cost > state.player.point) return;
 
   if (isTacticalCard(card)) {
     if (requiredTargetCount(card) === 0) {
@@ -1320,6 +1389,10 @@ function bindEvents() {
         cancelTargeting();
         // ターンは続く。勝利したときだけ結果を表示する。
         render();
+      }
+      if (action === "play-group" && engine.playSelectedGroup()) {
+        cancelTargeting();
+        proceedAfterPlayerAction();
       }
       if (action === "end-turn" && engine.endTurn()) {
         cancelTargeting();

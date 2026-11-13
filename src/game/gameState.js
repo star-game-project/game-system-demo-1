@@ -37,7 +37,7 @@ export function createInitialGameState(
     battle,
     ruleset: normalizeRulesetId(ruleset),
     pointRules: rules,
-    // 役の強化レベル（{ 役id: レベル }）。連戦中に報酬で上がる。
+    // 系統ごとの強化レベル（{ 系統: レベル }）。連戦中に報酬で上がる。
     roleLevels: { ...roleLevels },
     turn: 1,
     phase: PHASES.DRAW_SELECT,
@@ -58,7 +58,11 @@ export function createInitialGameState(
     // 攻撃の対象。倒れたら生き残っている先頭の敵に移る。
     targetId: "enemy_1",
     selectedCardId: null,
-    currentRole: evaluateHandRole(openingDraw.drawn, roleLevels, normalizeRulesetId(ruleset)),
+    // 「選んで出す（試作）」で、出すために選んでいるカード。役はこのカードだけで判定する。
+    selectedCardIds: [],
+    currentRole: normalizeRulesetId(ruleset) === "select_play"
+      ? evaluateHandRole([], roleLevels, "select_play")
+      : evaluateHandRole(openingDraw.drawn, roleLevels, normalizeRulesetId(ruleset)),
     // Role Lock で固定した役。固定しているターンだけ持ち、ターン終了で null に戻す。
     lockedRole: null,
     lastAttack: null,

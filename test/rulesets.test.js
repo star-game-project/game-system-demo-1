@@ -8,10 +8,10 @@ import {
   normalizeRulesetId,
 } from "../src/game/rulesets.js";
 
-test("the current rules and the dice-colour prototype are both selectable", () => {
+test("the current rules and both prototypes are selectable", () => {
   assert.deepEqual(
     RULESETS.map((ruleset) => ruleset.id),
-    ["standard", "dice_color"],
+    ["standard", "dice_color", "select_play"],
   );
   assert.equal(DEFAULT_RULESET_ID, "standard");
   assert.ok(RULESET_BY_ID[DEFAULT_RULESET_ID]);

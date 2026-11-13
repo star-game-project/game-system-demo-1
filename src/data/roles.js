@@ -200,9 +200,36 @@ export const ROLE_BY_ID = Object.freeze(
   Object.fromEntries([...HAND_ROLES, ...COLOR_ROLES].map((role) => [role.id, role])),
 );
 
-/** そのルールで判定する役。現行ルールは HAND_ROLES だけ、「ダイスの色（試作）」は色の役も加える。 */
+/**
+ * 「選んで出す（試作）」で判定する役。出すカードを自分で選べるため、次のように変える。
+ * - 「全部」を条件にする段階（全部同じ・偶数のみ・奇数のみ）は、2〜3枚だけ選べば必ず成立してしまう。
+ *   そこで出す枚数の下限を手札1回分（5枚）に上げる。
+ * - 減算役 1-2-3 は、1・2・3 を一緒に出さなければ避けられて罰則にならないため判定しない。
+ */
+const SELECT_PLAY_MIN_CARDS = 5;
+const SELECT_PLAY_ROLES = Object.freeze(
+  HAND_ROLES.filter((role) => role.kind === "bonus").map((role) =>
+    role.minHandSize
+      ? Object.freeze({
+          ...role,
+          minHandSize: SELECT_PLAY_MIN_CARDS,
+          description: role.description
+            .replace("手札すべて", "出したカードすべて")
+            .replace("（3枚以上）", "")
+            .concat(`（${SELECT_PLAY_MIN_CARDS}枚以上）`),
+        })
+      : role,
+  ),
+);
+
+/**
+ * そのルールで判定する役。現行ルールは HAND_ROLES だけ、「ダイスの色（試作）」は色の役も加える。
+ * 「選んで出す（試作）」は、出したカードで判定する用に条件を変えた役（SELECT_PLAY_ROLES）。
+ */
 export function rolesFor(ruleset = "standard") {
-  return ruleset === "dice_color" ? [...HAND_ROLES, ...COLOR_ROLES] : HAND_ROLES;
+  if (ruleset === "dice_color") return [...HAND_ROLES, ...COLOR_ROLES];
+  if (ruleset === "select_play") return SELECT_PLAY_ROLES;
+  return HAND_ROLES;
 }
 
 /** そのルールのボーナス役を、倍率の高い順（同じなら priority の高い順）に並べたもの。 */

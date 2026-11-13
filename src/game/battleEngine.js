@@ -9,6 +9,8 @@ import { ITEM_BY_ID } from "../data/items.js";
 import { canUseItem, healPlayer } from "./itemLogic.js";
 import {
   createTemporaryEffects,
+  getPassiveBonus,
+  getTemporaryBonus,
   isAreaAttackCard,
   isDefenseCard,
   isTacticalCard,
@@ -24,9 +26,167 @@ export class BattleEngine {
     this.random = random;
   }
 
-  /** いまの手札の役。Role Lock で固定しているターンは、手札に関係なく固定した役を返す。 */
+  /**
+   * いまの手札の役。Role Lock で固定しているターンは、手札に関係なく固定した役を返す。
+   * 「選んで出す（試作）」では、手札全体ではなく、出すために選んでいるカードだけで判定する。
+   */
   evaluateRole(hand = this.state.player.hand) {
+    if (this.isSelectPlay()) {
+      return evaluateHandRole(this.getSelectedCards(), this.state.roleLevels, this.state.ruleset);
+    }
     return this.state.lockedRole ?? evaluateHandRole(hand, this.state.roleLevels, this.state.ruleset);
+  }
+
+  // ---- 「選んで出す（試作）」 ----
+  // 手札から出すカード（攻撃・防御）を選び、1ターンに1回まとめて出す。出すとターンが終わる。
+  // 役は出したカードだけで判定し、攻撃力の合計に倍率を掛ける。防御値は合計してシールドにする（倍率なし）。
+  // 戦術カードとアイテムは、出す前に今までどおり1枚・1つずつ使う。
+
+  isSelectPlay() {
+    return this.state.ruleset === "select_play";
+  }
+
+  /** 出すために選んでいるカード（手札の並び順）。 */
+  getSelectedCards() {
+    const ids = this.state.selectedCardIds ?? [];
+    return this.state.player.hand.filter((card) => ids.includes(card.id));
+  }
+
+  getSelectedCost() {
+    return this.getSelectedCards().reduce((sum, card) => sum + card.cost, 0);
+  }
+
+  /** そのカードを、いまの選択に加えられるか（選択済みなら外せるか）。 */
+  canToggleSelection(cardId) {
+    if (!this.isSelectPlay() || this.state.phase !== PHASES.CARD_SELECT) return false;
+    const card = this.state.player.hand.find((item) => item.id === cardId);
+    if (!card || isTacticalCard(card)) return false;
+    if (this.state.selectedCardIds.includes(cardId)) return true;
+    return this.getSelectedCost() + card.cost <= this.state.player.point;
+  }
+
+  /** 選択に加える／外す。コストの合計がポイントを超える選択はできない。 */
+  toggleSelection(cardId) {
+    if (!this.canToggleSelection(cardId)) return false;
+    const ids = this.state.selectedCardIds;
+    this.state.selectedCardIds = ids.includes(cardId)
+      ? ids.filter((id) => id !== cardId)
+      : [...ids, cardId];
+    this.state.currentRole = this.evaluateRole();
+    const count = this.state.selectedCardIds.length;
+    this.state.battleMessage = count
+      ? `${count}枚を選択中（コスト ${this.getSelectedCost()} / ポイント ${this.state.player.point}）。`
+      : "出すカードを選んでください。";
+    return true;
+  }
+
+  /** 手札が変わったあと（戦術カードなど）に、選択を手札とポイントに合わせ直す。 */
+  pruneSelection() {
+    if (!this.isSelectPlay()) return;
+    const inHand = new Set(this.state.player.hand.map((card) => card.id));
+    this.state.selectedCardIds = this.state.selectedCardIds.filter((id) => inHand.has(id));
+    if (this.getSelectedCost() > this.state.player.point) this.state.selectedCardIds = [];
+  }
+
+  /**
+   * 選んだカードをまとめて出したときの結果。commit が false なら計算だけ（プレビュー用）。
+   * 個人攻撃のカードは対象の敵に、全体攻撃のカード（Sweep 3）は生き残っている全員に当たる。
+   * どちらも出したカード全体の役の倍率が掛かり、ブロックは敵ごとに1回受ける。
+   */
+  resolveSelectedGroup(commit = false) {
+    const cards = this.getSelectedCards();
+    if (!cards.length) return null;
+    const { player } = this.state;
+    const role = this.evaluateRole();
+    const attackCards = cards.filter((card) => !isDefenseCard(card));
+    const bonusOf = (card) =>
+      getPassiveBonus(card, player.hand) + getTemporaryBonus(player.temporaryEffects, this.state.turn);
+    const sumOf = (list) => list.reduce((sum, card) => sum + card.attack + bonusOf(card), 0);
+    const singleAttack = sumOf(attackCards.filter((card) => !isAreaAttackCard(card)));
+    const areaAttack = sumOf(attackCards.filter(isAreaAttackCard));
+    const baseAttack = attackCards.reduce((sum, card) => sum + card.attack, 0);
+    const totalAttack = singleAttack + areaAttack;
+    const target = this.getTargetEnemy();
+
+    const hits = attackCards.length
+      ? aliveEnemies(this.state.enemies)
+          .map((enemy) => ({
+            enemy,
+            damage: Math.round(((enemy === target ? singleAttack : 0) + areaAttack) * role.multiplier),
+          }))
+          .filter(({ damage }) => damage > 0)
+          .map(({ enemy, damage }) => {
+            const { blocked, dealt } = this.applyCpuBlock(damage, commit, enemy);
+            if (commit) enemy.hp = Math.max(0, enemy.hp - dealt);
+            return { enemyId: enemy.id, enemyName: enemy.name, damage, blocked, dealt, defeated: enemy.hp <= 0 };
+          })
+      : [];
+
+    return {
+      cards,
+      cost: cards.reduce((sum, card) => sum + card.cost, 0),
+      roles: role.roles,
+      roleId: role.roleId,
+      roleName: role.roleName,
+      roleMultiplier: role.multiplier,
+      baseAttack,
+      bonus: totalAttack - baseAttack,
+      totalAttack,
+      finalAttack: Math.round(totalAttack * role.multiplier),
+      hasArea: areaAttack > 0,
+      hits,
+      blocked: hits.reduce((sum, hit) => sum + hit.blocked, 0),
+      dealt: hits.reduce((sum, hit) => sum + hit.dealt, 0),
+      shield: cards.reduce((sum, card) => sum + (isDefenseCard(card) ? card.defense : 0), 0),
+    };
+  }
+
+  getGroupPreview() {
+    return this.resolveSelectedGroup(false);
+  }
+
+  /** 選んだカードをまとめて出す。出すとターンが終わり、敵の行動へ進む。 */
+  playSelectedGroup() {
+    if (!this.isSelectPlay() || this.state.phase !== PHASES.CARD_SELECT) return null;
+    const { player } = this.state;
+    const cost = this.getSelectedCost();
+    if (!this.getSelectedCards().length || cost > player.point) return null;
+
+    const result = this.resolveSelectedGroup(true);
+    const ids = new Set(result.cards.map((card) => card.id));
+    player.point = Math.max(0, player.point - cost);
+    player.shield += result.shield;
+    result.cards.forEach((card) => player.temporaryEffects.push(...createTemporaryEffects(card, this.state.turn)));
+    player.hand = player.hand.filter((card) => !ids.has(card.id));
+    player.discardPile.push(...result.cards);
+    player.cardsPlayed += result.cards.length;
+
+    const names = result.cards.map((card) => card.name).join("・");
+    this.state.lastAttack = result.hits.length ? { ...result, cardName: names } : null;
+    this.state.lastDefense = result.shield ? { cardName: names, shield: result.shield } : null;
+    this.state.turnTotals.cards += result.cards.length;
+    this.state.turnTotals.dealt += result.dealt;
+    this.state.turnTotals.blocked += result.blocked;
+    this.state.turnTotals.shield += result.shield;
+    this.state.selectedCardIds = [];
+    this.state.currentRole = this.evaluateRole();
+
+    const hitText = (hit) =>
+      `${hit.enemyName} ${hit.dealt}ダメージ${hit.blocked ? `（ブロック −${hit.blocked}）` : ""}${hit.defeated ? " 撃破！" : ""}`;
+    const parts = [
+      result.hits.length ? result.hits.map(hitText).join(" / ") : "",
+      result.shield ? `シールド +${result.shield}（現在 ${player.shield}）` : "",
+    ].filter(Boolean);
+    this.state.battleMessage = `${names} を出した — ${parts.join("。")}。`;
+
+    const alive = aliveEnemies(this.state.enemies);
+    if (!alive.length) {
+      this.state.phase = PHASES.VICTORY;
+    } else {
+      if (!alive.some((enemy) => enemy.id === this.state.targetId)) this.state.targetId = alive[0].id;
+      this.state.phase = PHASES.PLAYER_ATTACK;
+    }
+    return result;
   }
 
   /** 山札から引く。山札が尽きたら捨て札をシャッフルして再構築する。 */
@@ -84,7 +244,7 @@ export class BattleEngine {
   }
 
   selectCard(cardId) {
-    if (this.state.phase !== PHASES.CARD_SELECT) return false;
+    if (this.state.phase !== PHASES.CARD_SELECT || this.isSelectPlay()) return false;
     const card = this.state.player.hand.find((item) => item.id === cardId);
     if (!card || isTacticalCard(card)) return false;
     if (card.cost > this.state.player.point) return false;
@@ -204,6 +364,7 @@ export class BattleEngine {
     if (!player.hand.some((item) => item.id === this.state.selectedCardId)) {
       this.state.selectedCardId = null;
     }
+    this.pruneSelection();
     this.state.currentRole = this.evaluateRole(player.hand);
     this.state.battleMessage = message;
     return { card, targets, role: this.state.currentRole };
@@ -252,7 +413,7 @@ export class BattleEngine {
   }
 
   useSelectedCard() {
-    if (this.state.phase !== PHASES.CARD_SELECT) return null;
+    if (this.state.phase !== PHASES.CARD_SELECT || this.isSelectPlay()) return null;
     const card = this.getSelectedCard();
     if (!card || isTacticalCard(card)) return null;
     if (card.cost > this.state.player.point) return null;
@@ -395,6 +556,7 @@ export class BattleEngine {
     // シールドと役の固定はターンをまたがない。
     this.state.player.shield = 0;
     this.state.lockedRole = null;
+    this.state.selectedCardIds = [];
     this.state.turnTotals = createTurnTotals();
 
     // 手札はターン終了時にすべて捨て札へ送り、新しい手札を引き直す。
@@ -416,6 +578,8 @@ export class BattleEngine {
     if (this.state.phase !== PHASES.CARD_SELECT) return false;
     const item = ITEM_BY_ID[this.state.player.items[slot]];
     if (item?.effect.type === "LOCK_ROLE") {
+      // 「選んで出す（試作）」では役は出すカードで決まり、1ターンに1回しか出さないので固定する意味がない。
+      if (this.isSelectPlay()) return false;
       // 固定は1ターンに1回。倍率が1以下（役なし・減算）を固定しても意味がない。
       return !this.state.lockedRole && this.state.currentRole.multiplier > 1;
     }
@@ -467,6 +631,7 @@ export class BattleEngine {
   endTurn() {
     if (this.state.phase !== PHASES.CARD_SELECT) return false;
     this.state.selectedCardId = null;
+    this.state.selectedCardIds = [];
     this.state.phase = PHASES.PLAYER_ATTACK;
     this.state.battleMessage = "ターンを終了します。";
     return true;

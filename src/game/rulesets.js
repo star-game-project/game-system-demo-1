@@ -14,6 +14,12 @@ export const RULESETS = Object.freeze([
     description:
       "カード1枚ごとにダイスの色（4色）が付き、目に加えて色でも役を判定する（同じ色3枚・4枚・全部同色）。",
   }),
+  Object.freeze({
+    id: "select_play",
+    label: "選んで出す（試作）",
+    description:
+      "手札から出すカードを選び、1ターンに1回まとめて出す。役は出したカードだけで判定し、攻撃力の合計に倍率を掛ける。",
+  }),
 ]);
 
 export const DEFAULT_RULESET_ID = "standard";

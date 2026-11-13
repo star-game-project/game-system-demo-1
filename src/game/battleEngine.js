@@ -5,7 +5,7 @@ import { calculateAttack } from "./damageLogic.js";
 import { advanceCpuAction, aliveEnemies, cpuActionDamage, getCpuIntent } from "./enemyLogic.js";
 import { createTurnTotals } from "./gameState.js";
 import { recoverPoints } from "./pointRules.js";
-import { turnStartPhase } from "./rulesets.js";
+import { hasRule, turnStartPhase } from "./rulesets.js";
 import { ITEM_BY_ID } from "../data/items.js";
 import { canUseItem, healPlayer } from "./itemLogic.js";
 import {
@@ -45,7 +45,7 @@ export class BattleEngine {
   // 防御値は合計してシールドにする（倍率なし）。戦術カードとアイテムはその場で効果が出る。
 
   isSelectPlay() {
-    return this.state.ruleset === "select_play";
+    return hasRule(this.state.ruleset, "select_play");
   }
 
   /** 場に出したカード（出した順）。 */

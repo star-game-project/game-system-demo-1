@@ -4,7 +4,7 @@ import { createEnemies } from "../data/enemies.js";
 import { drawCards, shuffleDeck } from "./deckLogic.js";
 import { evaluateHandRole } from "./roleLogic.js";
 import { DEFAULT_POINT_RULES, normalizePointRules } from "./pointRules.js";
-import { DEFAULT_RULESET_ID, handSizeFor, normalizeRulesetId, turnStartPhase } from "./rulesets.js";
+import { DEFAULT_RULESET_ID, handSizeFor, hasRule, normalizeRulesetId, turnStartPhase } from "./rulesets.js";
 
 /** 1ターン中に使ったカードの合計。ターン開始時に作り直す。 */
 export function createTurnTotals() {
@@ -67,9 +67,10 @@ export function createInitialGameState(
     // 「選んで出す（試作）」で、このターンに場に出したカード（{ card, targetId, attack }、出した順）。
     // ターン終了時にまとめて処理する。役はこのカードだけで判定する。
     playedCards: [],
-    currentRole: normalizeRulesetId(ruleset) === "select_play"
-      ? evaluateHandRole([], roleLevels, "select_play")
-      : evaluateHandRole(openingDraw.drawn, roleLevels, normalizeRulesetId(ruleset)),
+    // 「選んで出す（試作）」では役は場に出したカードで決まるので、始めは役なし。
+    currentRole: hasRule(rulesetId, "select_play")
+      ? evaluateHandRole([], roleLevels, rulesetId)
+      : evaluateHandRole(openingDraw.drawn, roleLevels, rulesetId),
     // Role Lock で固定した役。固定しているターンだけ持ち、ターン終了で null に戻す。
     lockedRole: null,
     lastAttack: null,

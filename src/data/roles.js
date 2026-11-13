@@ -1,3 +1,5 @@
+import { hasRule } from "../game/rulesets.js";
+
 /**
  * 役はゲーム全体のルールとして管理する。
  *
@@ -207,29 +209,36 @@ export const ROLE_BY_ID = Object.freeze(
  * - 減算役 1-2-3 は、1・2・3 を一緒に出さなければ避けられて罰則にならないため判定しない。
  */
 const SELECT_PLAY_MIN_CARDS = 5;
-const SELECT_PLAY_ROLES = Object.freeze(
-  HAND_ROLES.filter((role) => role.kind === "bonus").map((role) =>
-    role.minHandSize
-      ? Object.freeze({
-          ...role,
-          minHandSize: SELECT_PLAY_MIN_CARDS,
-          description: role.description
-            .replace("手札すべて", "出したカードすべて")
-            .replace("（3枚以上）", "")
-            .concat(`（${SELECT_PLAY_MIN_CARDS}枚以上）`),
-        })
-      : role,
-  ),
-);
+function forSelectPlay(roles) {
+  return Object.freeze(
+    roles.filter((role) => role.kind === "bonus").map((role) =>
+      role.minHandSize
+        ? Object.freeze({
+            ...role,
+            minHandSize: Math.max(role.minHandSize, SELECT_PLAY_MIN_CARDS),
+            description: role.description
+              .replace("手札すべて", "出したカードすべて")
+              .replace(/（\d+枚以上）/, "")
+              .concat(`（${Math.max(role.minHandSize, SELECT_PLAY_MIN_CARDS)}枚以上）`),
+          })
+        : role,
+    ),
+  );
+}
+
+const COLOR_HAND_ROLES = Object.freeze([...HAND_ROLES, ...COLOR_ROLES]);
+const SELECT_PLAY_ROLES = forSelectPlay(HAND_ROLES);
+const SELECT_PLAY_COLOR_ROLES = forSelectPlay(COLOR_HAND_ROLES);
 
 /**
- * そのルールで判定する役。現行ルールは HAND_ROLES だけ、「ダイスの色（試作）」は色の役も加える。
- * 「選んで出す（試作）」は、出したカードで判定する用に条件を変えた役（SELECT_PLAY_ROLES）。
+ * そのルールで判定する役。試作ルールは組み合わせられる（rulesets.js）。
+ * - 「ダイスの色（試作）」が入っていれば、色の役を加える。
+ * - 「選んで出す（試作）」が入っていれば、出したカードで判定する用に条件を変える（forSelectPlay）。
  */
 export function rolesFor(ruleset = "standard") {
-  if (ruleset === "dice_color") return [...HAND_ROLES, ...COLOR_ROLES];
-  if (ruleset === "select_play") return SELECT_PLAY_ROLES;
-  return HAND_ROLES;
+  const color = hasRule(ruleset, "dice_color");
+  if (hasRule(ruleset, "select_play")) return color ? SELECT_PLAY_COLOR_ROLES : SELECT_PLAY_ROLES;
+  return color ? COLOR_HAND_ROLES : HAND_ROLES;
 }
 
 /** そのルールのボーナス役を、倍率の高い順（同じなら priority の高い順）に並べたもの。 */

@@ -44,10 +44,13 @@ import {
 import {
   DEFAULT_RULESET_ID,
   DEFAULT_SELECT_PLAY_HAND_SIZE,
-  RULESETS,
-  RULESET_BY_ID,
+  RULE_OPTIONS,
   SELECT_PLAY_HAND_SIZES,
-  normalizeRulesetId,
+  STANDARD_RULESET,
+  hasRule,
+  ruleOptionsOf,
+  rulesetIdFrom,
+  rulesetLabel,
 } from "./game/rulesets.js";
 import { DICE_COLOR_BY_ID } from "./data/diceColors.js";
 import { ITEMS, ITEM_BY_ID, ITEM_RULES } from "./data/items.js";
@@ -104,7 +107,7 @@ function startRun() {
   runRoleLevels = {};
   runItems = itemsFromCounts(startItemCounts);
   // 色は連戦を始めるときに1枚ずつ決め、連戦中は変わらない。
-  runColors = ruleset === "dice_color" ? rollRunColors(runCounts) : null;
+  runColors = hasRule(ruleset, "dice_color") ? rollRunColors(runCounts) : null;
   startBattle();
 }
 
@@ -756,7 +759,8 @@ function renderRoleTable(levels = {}, rulesetId = ruleset) {
 }
 
 function roleRuleHint(rulesetId = ruleset) {
-  const basis = rulesetId === "dice_color" ? "手札全体の目と色" : rulesetId === "select_play" ? "出したカードの目" : "手札全体の目";
+  const cards = hasRule(rulesetId, "select_play") ? "場に出したカード" : "手札全体";
+  const basis = `${cards}の目${hasRule(rulesetId, "dice_color") ? "と色" : ""}`;
   return `${basis}で役が決まります。役は系統ごとにまとめてあり、強い段階が成立するほど同じ名前のまま倍率が上がります。系統ごとに最も高い段階を1つ採り、系統をまたいで倍率を掛け合わせます。`;
 }
 
@@ -810,17 +814,24 @@ function renderStartItems() {
   `;
 }
 
+/**
+ * ルールの選択。試作ルールはそれぞれ ON / OFF でき、組み合わせられる。
+ * 「現行ルール」を押すと、試作ルールをすべて OFF にする。
+ */
 function renderRulesetPicker() {
-  const options = RULESETS.map(
-    (option) => `
-      <button class="ruleset-option ${option.id === ruleset ? "is-active" : ""}" data-ruleset="${option.id}" aria-pressed="${option.id === ruleset}">
-        <strong>${option.label}</strong>
-        <small>${option.description}</small>
-      </button>
-    `,
-  ).join("");
+  const standard = !ruleOptionsOf(ruleset).length;
+  const optionButton = (option, active) => `
+    <button class="ruleset-option ${active ? "is-active" : ""}" data-ruleset="${option.id}" aria-pressed="${active}">
+      <strong>${option.id === STANDARD_RULESET.id ? option.label : `${active ? "ON" : "OFF"} · ${option.label}`}</strong>
+      <small>${option.description}</small>
+    </button>
+  `;
+  const options = [
+    optionButton(STANDARD_RULESET, standard),
+    ...RULE_OPTIONS.map((option) => optionButton(option, hasRule(ruleset, option.id))),
+  ].join("");
   // 「選んで出す（試作）」はドロー選択がない代わりに、手札の枚数を選ぶ。
-  const handSizes = ruleset === "select_play"
+  const handSizes = hasRule(ruleset, "select_play")
     ? `
       <div class="ruleset-picker__hand-size">
         <span>手札の枚数（毎ターン引き直す）</span>
@@ -830,7 +841,7 @@ function renderRulesetPicker() {
     : "";
   return `
     <section class="ruleset-picker">
-      <div><span class="eyebrow">RULES</span><strong>どのルールで遊ぶか</strong></div>
+      <div><span class="eyebrow">RULES</span><strong>どのルールで遊ぶか：${rulesetLabel(ruleset)}</strong><small>試作ルールはそれぞれ ON / OFF でき、組み合わせて遊べる。</small></div>
       <div class="ruleset-picker__options">${options}</div>
       ${handSizes}
     </section>
@@ -1124,7 +1135,7 @@ function render() {
           <span class="brand__mark"><i>D<small>6</small></i></span>
           <span><strong>DICE HAND</strong><small>TACTICAL CARD BATTLE</small></span>
         </a>
-        <div class="topbar__center"><span>BATTLE</span><strong>#${String(state.battle).padStart(3, "0")}</strong><span>DECK ${countCards(runCounts)}</span><span class="ruleset-chip ruleset-chip--${state.ruleset}">${RULESET_BY_ID[state.ruleset].label}</span></div>
+        <div class="topbar__center"><span>BATTLE</span><strong>#${String(state.battle).padStart(3, "0")}</strong><span>DECK ${countCards(runCounts)}</span><span class="ruleset-chip ${ruleOptionsOf(state.ruleset).map((id) => `ruleset-chip--${id}`).join(" ")}">${rulesetLabel(state.ruleset)}</span></div>
         <div class="topbar__actions">
           <button class="icon-button icon-button--demo" data-action="skip-battle" ${engine.canSkipBattle() ? "" : "disabled"} aria-label="戦闘をスキップして報酬へ（デモ用）" title="戦闘をスキップして報酬へ（デモ用）">⏭</button>
           <button class="icon-button" data-action="show-roles" aria-label="役一覧" title="役一覧">役</button>
@@ -1259,7 +1270,14 @@ function bindEvents() {
 
   app.querySelectorAll("[data-ruleset]").forEach((button) => {
     button.addEventListener("click", () => {
-      ruleset = normalizeRulesetId(button.dataset.ruleset);
+      const id = button.dataset.ruleset;
+      if (id === STANDARD_RULESET.id) {
+        ruleset = DEFAULT_RULESET_ID;
+      } else {
+        // 押した試作ルールだけを切り替え、ほかの試作ルールはそのまま残す。
+        const on = ruleOptionsOf(ruleset);
+        ruleset = rulesetIdFrom(on.includes(id) ? on.filter((option) => option !== id) : [...on, id]);
+      }
       render();
     });
   });

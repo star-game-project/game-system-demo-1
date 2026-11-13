@@ -330,9 +330,9 @@ table(
   document.querySelector("#ruleset-table"),
   ["ルール", "内容", "既定"],
   RULESETS.map((ruleset) => [
-    `<b>${ruleset.label}</b><br /><small><code>${ruleset.id}</code></small>`,
+    `<b>${ruleset.label}</b><br /><small><code>${ruleset.id}</code>${ruleset.id === DEFAULT_RULESET_ID ? "" : " · ON / OFF・組み合わせ可"}</small>`,
     ruleset.description,
-    ruleset.id === DEFAULT_RULESET_ID ? "○" : "",
+    ruleset.id === DEFAULT_RULESET_ID ? "○（試作ルールがすべて OFF）" : "",
   ]),
 );
 

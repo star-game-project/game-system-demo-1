@@ -115,7 +115,7 @@
       <div class="docs-table-wrap"><table id="default-deck-table"></table></div>
 
       <h3>3.5 ルールの選択</h3>
-      <p>構築画面の <b>RULES</b> で、どのルールで遊ぶかを選ぶ。選んだルールは連戦中に引き継ぎ、戦闘画面の上部に表示する。途中で変えるには構築画面に戻る（次は1戦目から）。</p>
+      <p>構築画面の <b>RULES</b> で、どのルールで遊ぶかを選ぶ。<b>試作ルール</b>（ダイスの色・選んで出す）は<b>それぞれ ON / OFF でき、組み合わせて遊べる</b>。どれも OFF なら現行ルール、「現行ルール」を押すとすべて OFF になる。選んだルールは連戦中に引き継ぎ、戦闘画面の上部に表示する（例：「ダイスの色（試作）＋選んで出す（試作）」）。途中で変えるには構築画面に戻る（次は1戦目から）。</p>
       <div class="docs-table-wrap"><table id="ruleset-table"></table></div>
       <aside class="docs-callout docs-callout--demo" data-summary="ルールの選択は、検討中の大きな変更を現行ルールと遊び比べるためのもの">
         <span class="docs-tag docs-tag--demo">デモ限定</span>
@@ -330,6 +330,7 @@ hp      -= taken</code></pre>
         <li>Wild Die がワイルドなのは目だけ。色はそのカード自身の色で数える。</li>
         <li>色の系統（FLUSH）も、報酬の役の強化（11.3）の候補に入る。現行ルールでは候補に出ない。</li>
         <li>現行ルールでは、カードに色があっても色の役は判定しない。</li>
+        <li>「選んで出す（試作）」と組み合わせると、色の役も<b>場に出したカードの色</b>で判定する（7.7）。FLUSH（全部）は場に5枚以上あるときだけ成立する。</li>
       </ul>
       <p class="docs-note">成立率は、色が一様に付いた手札5枚での実測値（10万回）。目の役の倍率の並びに、成立しやすさが近いものを当てはめた仮の倍率である。代表的なデッキで期待倍率は 1.233 → 1.318（約7%増）になる。実際には報酬で色を選んで寄せられるため、成立率はこれより高くなりうる。</p>
 
@@ -359,7 +360,7 @@ hp      -= taken</code></pre>
         <li><b>減算役 1-2-3 は判定しない</b>。1・2・3 を一緒に出さなければ避けられ、罰則にならないため。</li>
         <li>防御カードの目も役に入る。</li>
         <li>Role Lock は使えない（役はターン終了時の場で決まるため）。</li>
-        <li>ダイスの色は付かない（現行ルールの役だけで比べる）。</li>
+        <li>「ダイスの色（試作）」と組み合わせられる。組み合わせると、色の役も場に出したカードの色で判定する（FLUSH（全部）は場に5枚以上）。</li>
       </ul>
       <aside class="docs-callout docs-callout--open" data-summary="選んで出す：倍率・ポイント・敵の強さの釣り合い、使わなかったカードの扱い">
         <span class="docs-tag docs-tag--open">検討中</span>
@@ -582,7 +583,7 @@ target.hp    -= dealt</code></pre>
       <h2>12. 状態</h2>
       <pre><code>type GameState = {
   battle: number;               // 連戦の何戦目か（1始まり）
-  ruleset: "standard" | "dice_color" | "select_play"; // 構築画面で選んだルール（3.5）
+  ruleset: string; // 構築画面で選んだルール（3.5）。"standard" か、ON にした試作ルールを "+" でつないだもの（"dice_color" / "select_play" / "dice_color+select_play"）
   playedCards: { card, targetId, attack }[]; // 「選んで出す（試作）」で場に出したカード（出した順。ターン終了時に処理。7.7）
   pointRules: { startPoint: number; maxPoint: number; recovery: number; fullRefill: boolean };
   roleLevels: { [family: string]: number }; // 系統ごとの強化レベル（例：{ set: 2 }。連戦中に引き継ぐ）

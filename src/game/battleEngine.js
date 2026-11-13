@@ -188,7 +188,7 @@ export class BattleEngine {
     player.deck = result.deck;
     player.discardPile = result.discardPile;
     // 「目と色を振る（試作）」では、手札に来たときに目（と色）を振る。
-    result.drawn = rollFacesOnDraw(result.drawn, this.state.ruleset, this.random);
+    result.drawn = rollFacesOnDraw(result.drawn, this.state.ruleset, this.random, this.state.colorCount);
     player.hand.push(...result.drawn);
     return result;
   }

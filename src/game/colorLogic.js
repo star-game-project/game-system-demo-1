@@ -1,5 +1,5 @@
 import { CARD_BY_KEY } from "../data/cards.js";
-import { DICE_COLORS } from "../data/diceColors.js";
+import { DICE_COLOR_COUNT, diceColorsFor } from "../data/diceColors.js";
 import { canRemoveFromRun } from "./rewardLogic.js";
 
 /**
@@ -8,17 +8,18 @@ import { canRemoveFromRun } from "./rewardLogic.js";
  * 枚数（runCounts）とは別に持つことで、現行ルールのデッキの持ち方には手を入れない。
  */
 
-/** 色を1つ等確率で選ぶ。 */
-export function rollDiceColor(random = Math.random) {
-  return DICE_COLORS[Math.floor(random() * DICE_COLORS.length)].id;
+/** 色を1つ等確率で選ぶ。colorCount は使う色の数（構築画面で選ぶ。既定4）。 */
+export function rollDiceColor(random = Math.random, colorCount = DICE_COLOR_COUNT.DEFAULT) {
+  const colors = diceColorsFor(colorCount);
+  return colors[Math.floor(random() * colors.length)].id;
 }
 
 /** 連戦を始めるときに、デッキの全カードへ1枚ずつ色を付ける。 */
-export function rollRunColors(counts, random = Math.random) {
+export function rollRunColors(counts, random = Math.random, colorCount = DICE_COLOR_COUNT.DEFAULT) {
   return Object.fromEntries(
     Object.entries(counts)
       .filter(([, count]) => count > 0)
-      .map(([key, count]) => [key, Array.from({ length: count }, () => rollDiceColor(random))]),
+      .map(([key, count]) => [key, Array.from({ length: count }, () => rollDiceColor(random, colorCount))]),
   );
 }
 

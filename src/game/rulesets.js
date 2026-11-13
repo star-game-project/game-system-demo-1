@@ -20,7 +20,7 @@ export const RULE_OPTIONS = Object.freeze([
     id: "dice_color",
     label: "ダイスの色（試作）",
     description:
-      "カード1枚ごとにダイスの色（4色）が付き、目に加えて色でも役を判定する（同じ色3枚・4枚・全部同色）。",
+      "カード1枚ごとにダイスの色（既定4色、2〜6色で変えられる）が付き、目に加えて色でも役を判定する（同じ色3枚・4枚・全部同色）。",
   }),
   Object.freeze({
     id: "select_play",

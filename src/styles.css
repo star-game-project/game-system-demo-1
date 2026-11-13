@@ -1864,6 +1864,8 @@ a:focus-visible {
 .dice-color--blue { color: #5ea8ff; }
 .dice-color--green { color: #5fd38f; }
 .dice-color--yellow { color: #ffd34d; }
+.dice-color--purple { color: #c48bff; }
+.dice-color--orange { color: #ff9b4a; }
 
 .battle-card .dice-color {
   position: absolute;
@@ -1876,6 +1878,8 @@ a:focus-visible {
 .battle-card.dice-accent--blue, .catalogue-card.dice-accent--blue { --card-accent: #5ea8ff; }
 .battle-card.dice-accent--green, .catalogue-card.dice-accent--green { --card-accent: #5fd38f; }
 .battle-card.dice-accent--yellow, .catalogue-card.dice-accent--yellow { --card-accent: #ffd34d; }
+.battle-card.dice-accent--purple, .catalogue-card.dice-accent--purple { --card-accent: #c48bff; }
+.battle-card.dice-accent--orange, .catalogue-card.dice-accent--orange { --card-accent: #ff9b4a; }
 
 /* ---------- アイテム ---------- */
 
@@ -1961,6 +1965,8 @@ a:focus-visible {
 .field-card.dice-accent--blue { --card-accent: #5ea8ff; }
 .field-card.dice-accent--green { --card-accent: #5fd38f; }
 .field-card.dice-accent--yellow { --card-accent: #ffd34d; }
+.field-card.dice-accent--purple { --card-accent: #c48bff; }
+.field-card.dice-accent--orange { --card-accent: #ff9b4a; }
 
 .ruleset-picker__hand-size { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 10px; font-size: 12px; color: var(--muted); }
 .ruleset-picker__note { margin: 10px 0 0; font-size: 11px; color: var(--muted); }

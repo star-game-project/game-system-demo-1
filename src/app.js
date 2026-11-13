@@ -52,7 +52,7 @@ import {
   rulesetIdFrom,
   rulesetLabel,
 } from "./game/rulesets.js";
-import { DICE_COLOR_BY_ID } from "./data/diceColors.js";
+import { DICE_COLOR_BY_ID, DICE_COLOR_COUNT, diceColorsFor } from "./data/diceColors.js";
 import { ITEMS, ITEM_BY_ID, ITEM_RULES } from "./data/items.js";
 import {
   applyItemReward,
@@ -104,6 +104,8 @@ let runItems = [];
 let startItemCounts = {};
 // 「選んで出す（試作）」の手札の枚数（構築画面で 6 / 7 から選ぶ）。ほかのルールでは使わない。
 let selectHandSize = DEFAULT_SELECT_PLAY_HAND_SIZE;
+// 「ダイスの色（試作）」で使う色の数（構築画面で選ぶ。2〜6、既定4）。連戦中は変えない。
+let diceColorCount = DICE_COLOR_COUNT.DEFAULT;
 // 報酬画面の状態：{ offers, gainKey, removeKey, roleOffers, roleKey, itemOffers, itemKey, battle, playerHp }
 let reward = null;
 
@@ -114,7 +116,9 @@ function startRun() {
   runItems = itemsFromCounts(startItemCounts);
   // 色は連戦を始めるときに1枚ずつ決め、連戦中は変わらない。
   // 「目と色を振る（試作）」も ON なら、色はカードに固定せず手札に来るたびに振るので持たない。
-  runColors = hasRule(ruleset, "dice_color") && !hasRule(ruleset, "roll_dice") ? rollRunColors(runCounts) : null;
+  runColors = hasRule(ruleset, "dice_color") && !hasRule(ruleset, "roll_dice")
+    ? rollRunColors(runCounts, Math.random, diceColorCount)
+    : null;
   startBattle();
 }
 
@@ -130,6 +134,7 @@ function startBattle(carry = {}) {
       roleLevels: runRoleLevels,
       items: runItems,
       handSize: selectHandSize,
+      colorCount: diceColorCount,
       ...carry,
     }),
   );
@@ -144,7 +149,7 @@ function openReward() {
   reward = {
     offers,
     // 候補の色は先に決めて見せる（入手したらその色になる）。
-    offerColors: runColors ? offers.map(() => rollDiceColor()) : null,
+    offerColors: runColors ? offers.map(() => rollDiceColor(Math.random, diceColorCount)) : null,
     gainKey: null,
     removeKey: null,
     // 色があるときは、同じカードでも色ごとに別の1枚として削除を選ぶ。
@@ -855,6 +860,17 @@ function renderRulesetPicker() {
       </div>
     `
     : "";
+  // 「ダイスの色（試作）」は色の数を選べる。
+  const colorCounts = hasRule(ruleset, "dice_color")
+    ? `
+      <div class="ruleset-picker__hand-size">
+        <span>色の数（${diceColorsFor(diceColorCount).map((color) => color.label).join("・")}）</span>
+        ${Array.from({ length: DICE_COLOR_COUNT.MAX - DICE_COLOR_COUNT.MIN + 1 }, (_, index) => DICE_COLOR_COUNT.MIN + index)
+          .map((count) => `<button class="command-button command-button--secondary ${count === diceColorCount ? "is-active" : ""}" data-color-count="${count}" aria-pressed="${count === diceColorCount}">${count}色</button>`)
+          .join("")}
+      </div>
+    `
+    : "";
   const rollNote = hasRule(ruleset, "roll_dice")
     ? `<p class="ruleset-picker__note">目${hasRule(ruleset, "dice_color") ? "と色" : ""}は手札に来るたびに振るので、カードに書かれた目${hasRule(ruleset, "dice_color") ? "・色" : ""}は使われない（構築画面の目の上限は今のまま）。</p>`
     : "";
@@ -862,6 +878,7 @@ function renderRulesetPicker() {
     <section class="ruleset-picker">
       <div><span class="eyebrow">RULES</span><strong>どのルールで遊ぶか：${rulesetLabel(ruleset)}</strong><small>試作ルールはそれぞれ ON / OFF でき、組み合わせて遊べる。</small></div>
       <div class="ruleset-picker__options">${options}</div>
+      ${colorCounts}
       ${handSizes}
       ${rollNote}
     </section>
@@ -1292,6 +1309,13 @@ function bindEvents() {
       const key = input.dataset.pointRule;
       const value = input.type === "checkbox" ? input.checked : input.value;
       pointRules = normalizePointRules({ ...pointRules, [key]: value });
+      render();
+    });
+  });
+
+  app.querySelectorAll("[data-color-count]").forEach((button) => {
+    button.addEventListener("click", () => {
+      diceColorCount = Number(button.dataset.colorCount);
       render();
     });
   });

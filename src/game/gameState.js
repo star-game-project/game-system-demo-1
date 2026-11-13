@@ -5,6 +5,7 @@ import { drawCards, shuffleDeck } from "./deckLogic.js";
 import { evaluateHandRole } from "./roleLogic.js";
 import { DEFAULT_POINT_RULES, normalizePointRules } from "./pointRules.js";
 import { rollFacesOnDraw } from "./diceRollLogic.js";
+import { normalizeColorCount } from "../data/diceColors.js";
 import { DEFAULT_RULESET_ID, handSizeFor, hasRule, normalizeRulesetId, turnStartPhase } from "./rulesets.js";
 
 /** 1ターン中に使ったカードの合計。ターン開始時に作り直す。 */
@@ -17,7 +18,7 @@ export function createTurnTotals() {
  * それ以外（山札・ポイント・CPU）は毎戦リセットする。pointRules は構築画面で選んだポイント設定、
  * roleLevels は報酬で強化した系統ごとのレベル（{ set: 2 } など）、ruleset は構築画面で選んだルール（rulesets.js）、
  * items は持っているアイテム（id の配列。連戦中に持ち越す）。handSize は「選んで出す（試作）」の手札の枚数
- * （構築画面で選ぶ。ほかのルールでは無視して5枚）。
+ * （構築画面で選ぶ。ほかのルールでは無視して5枚）。colorCount は「ダイスの色（試作）」の色の数（2〜6、既定4）。
  */
 export function createInitialGameState(
   random = Math.random,
@@ -30,6 +31,7 @@ export function createInitialGameState(
     ruleset = DEFAULT_RULESET_ID,
     items = [],
     handSize,
+    colorCount,
   } = {},
 ) {
   const rulesetId = normalizeRulesetId(ruleset);
@@ -38,13 +40,16 @@ export function createInitialGameState(
   const shuffled = shuffleDeck(deckCards ?? createDemoDeck(), random);
   const openingDraw = drawCards(shuffled, size);
   // 「目と色を振る（試作）」では、最初の手札の目（と色）もここで振る。
-  openingDraw.drawn = rollFacesOnDraw(openingDraw.drawn, rulesetId, random);
+  const colors = normalizeColorCount(colorCount);
+  openingDraw.drawn = rollFacesOnDraw(openingDraw.drawn, rulesetId, random, colors);
 
   return {
     battle,
     ruleset: rulesetId,
     // 毎ターン引き直す手札の枚数。
     handSize: size,
+    // 「ダイスの色（試作）」で使う色の数（構築画面で選ぶ。2〜6、既定4）。手札に来たときに色を振るときに使う。
+    colorCount: colors,
     pointRules: rules,
     // 系統ごとの強化レベル（{ 系統: レベル }）。連戦中に報酬で上がる。
     roleLevels: { ...roleLevels },

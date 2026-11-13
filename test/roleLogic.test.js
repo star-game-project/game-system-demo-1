@@ -20,9 +20,9 @@ test("SAME NUMBER outranks every other role and needs at least three cards", () 
   assert.equal(mult(2, 2, 2), 2.5);
   // 3枚に満たない場合は SAME NUMBER にならない。
   // 2枚のペアは必ず同じ目＝同じ偶奇なので、EVEN / ODD として拾われる。
-  assert.equal(evaluateHandRole(hand(5, 5)).roleName, "ODD");
-  assert.equal(evaluateHandRole(hand(6, 6)).roleName, "EVEN");
-  assert.equal(evaluateHandRole(hand(3, 3, 3)).roleName, "SAME NUMBER");
+  assert.equal(evaluateHandRole(hand(5, 5)).roleId, "odd_only");
+  assert.equal(evaluateHandRole(hand(6, 6)).roleId, "even_only");
+  assert.equal(evaluateHandRole(hand(3, 3, 3)).roleId, "same_number");
 });
 
 test("whole-hand roles need at least two cards", () => {
@@ -32,25 +32,25 @@ test("whole-hand roles need at least two cards", () => {
 });
 
 test("subset roles fire on partial matches so most hands score", () => {
-  assert.equal(evaluateHandRole(hand(3, 3, 1, 4, 6)).roleName, "PAIR");
-  assert.equal(evaluateHandRole(hand(3, 3, 1, 1, 6)).roleName, "TWO PAIR");
-  assert.equal(evaluateHandRole(hand(3, 3, 3, 1, 6)).roleName, "THREE OF A KIND");
-  assert.equal(evaluateHandRole(hand(3, 3, 3, 1, 1)).roleName, "FULL HOUSE");
-  assert.equal(evaluateHandRole(hand(3, 3, 3, 3, 1)).roleName, "FOUR OF A KIND");
+  assert.equal(evaluateHandRole(hand(3, 3, 1, 4, 6)).roleId, "pair");
+  assert.equal(evaluateHandRole(hand(3, 3, 1, 1, 6)).roleId, "two_pair");
+  assert.equal(evaluateHandRole(hand(3, 3, 3, 1, 6)).roleId, "three_of_a_kind");
+  assert.equal(evaluateHandRole(hand(3, 3, 3, 1, 1)).roleId, "full_house");
+  assert.equal(evaluateHandRole(hand(3, 3, 3, 3, 1)).roleId, "four_of_a_kind");
 });
 
 test("straights are scored by their length", () => {
-  assert.equal(evaluateHandRole(hand(4, 5, 6, 6, 6)).roleName, "THREE OF A KIND");
-  assert.equal(evaluateHandRole(hand(2, 4, 5, 6)).roleName, "THREE STRAIGHT");
-  assert.equal(evaluateHandRole(hand(3, 4, 5, 6)).roleName, "FOUR STRAIGHT");
-  assert.equal(evaluateHandRole(hand(2, 3, 4, 5, 6)).roleName, "FIVE STRAIGHT");
+  assert.equal(evaluateHandRole(hand(4, 5, 6, 6, 6)).roleId, "three_of_a_kind");
+  assert.equal(evaluateHandRole(hand(2, 4, 5, 6)).roleId, "three_straight");
+  assert.equal(evaluateHandRole(hand(3, 4, 5, 6)).roleId, "four_straight");
+  assert.equal(evaluateHandRole(hand(2, 3, 4, 5, 6)).roleId, "five_straight");
 });
 
 test("EVEN and ODD recognize hands containing only their parity", () => {
-  assert.equal(evaluateHandRole(hand(2, 4, 4, 6)).roleName, "EVEN");
-  assert.equal(evaluateHandRole(hand(1, 3, 3, 5)).roleName, "ODD");
+  assert.equal(evaluateHandRole(hand(2, 4, 4, 6)).roleId, "even_only");
+  assert.equal(evaluateHandRole(hand(1, 3, 3, 5)).roleId, "odd_only");
   // 手札全体の条件なので、1枚でも外れると成立しない。
-  assert.notEqual(evaluateHandRole(hand(2, 4, 4, 5)).roleName, "EVEN");
+  assert.notEqual(evaluateHandRole(hand(2, 4, 4, 5)).roleId, "even_only");
 });
 
 test("the 1-2-3 penalty multiplies in and is escaped by extending to four", () => {
@@ -92,9 +92,9 @@ test("a hand with no pattern at all still has no role", () => {
 });
 
 test("a wild die takes whichever value scores highest", () => {
-  assert.equal(evaluateHandRole(withWild(4, 4)).roleName, "SAME NUMBER");
-  assert.equal(evaluateHandRole(withWild(2, 3, 4, 5)).roleName, "FIVE STRAIGHT");
-  assert.equal(evaluateHandRole(withWild(4, 4, 6, 6)).roleName, "FULL HOUSE");
+  assert.equal(evaluateHandRole(withWild(4, 4)).roleId, "same_number");
+  assert.equal(evaluateHandRole(withWild(2, 3, 4, 5)).roleId, "five_straight");
+  assert.equal(evaluateHandRole(withWild(4, 4, 6, 6)).roleId, "full_house");
   // 1,5,5 + ワイルド：5 にすると THREE OF A KIND × ODD が両方成立し、最も高くなる。
   const oddTrio = evaluateHandRole(withWild(1, 5, 5));
   assert.deepEqual(oddTrio.roles.map((role) => role.id).sort(), ["odd_only", "three_of_a_kind"]);

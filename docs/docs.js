@@ -13,7 +13,7 @@ import {
   CARD_BY_KEY,
   DEFAULT_DECK_COUNTS,
 } from "../src/data/cards.js";
-import { BONUS_ROLES, COLOR_ROLES, PENALTY_ROLES, ROLE_FAMILIES } from "../src/data/roles.js";
+import { COLOR_ROLES, ROLE_FAMILY_INFO, roleFamiliesFor } from "../src/data/roles.js";
 import { summarizeDeck, bucketLimit } from "../src/game/deckBuilder.js";
 import { DEFAULT_RULESET_ID, RULESETS } from "../src/game/rulesets.js";
 import { ITEMS, ITEM_RULES } from "../src/data/items.js";
@@ -207,32 +207,37 @@ table(
 );
 
 // ---- 7.1 役一覧 ----
-const FAMILY_LABELS = {
-  set: "同じ目",
-  straight: "連番",
-  parity: "偶奇",
-  penalty: "減算",
-};
-
+// 役は系統ごとにまとめ、系統の中は段階を弱い順に並べる（ゲーム画面の役一覧と同じ）。
+const STANDARD_FAMILIES = roleFamiliesFor("standard");
 table(
   document.querySelector("#roles-table"),
-  ["役", "系統", "条件", "倍率", "単独成立率"],
-  [...BONUS_ROLES, ...PENALTY_ROLES].map((role) => [
-    `<b>${role.name}</b>${role.minHandSize ? `<br /><small>最低${role.minHandSize}枚</small>` : ""}`,
-    FAMILY_LABELS[role.family] ?? role.family,
-    role.description,
-    `<b class="${role.kind === "penalty" ? "is-risk" : "is-bonus"}">${multiplierLabel(role.multiplier)}</b>`,
-    MEASURED_FREQUENCY[role.id] ?? "—",
-  ]),
+  ["役（系統）", "段階", "条件", "倍率", "単独成立率"],
+  STANDARD_FAMILIES.flatMap(({ name, label, roles }) =>
+    roles.map((role, index) => [
+      index === 0 ? `<b>${name}</b><br /><small>${label}</small>` : "",
+      `${role.stage ?? "—"}${role.minHandSize ? `<br /><small>最低${role.minHandSize}枚</small>` : ""}`,
+      role.description,
+      `<b class="${role.kind === "penalty" ? "is-risk" : "is-bonus"}">${multiplierLabel(role.multiplier)}</b>`,
+      MEASURED_FREQUENCY[role.id] ?? "—",
+    ]),
+  ),
 );
 
 // 系統一覧
 table(
   document.querySelector("#families-table"),
-  ["系統", "含まれる役（倍率の高い順）"],
-  ROLE_FAMILIES.map(({ family, roles }) => [
-    `<b>${FAMILY_LABELS[family] ?? family}</b><br /><small><code>${family}</code></small>`,
-    roles.map((role) => `${role.name} ${multiplierLabel(role.multiplier)}`).join(" ＞ "),
+  ["系統", "表示名", "段階（弱い順）"],
+  STANDARD_FAMILIES.map(({ family, name, label, roles }) => [
+    `<b>${label}</b><br /><small><code>${family}</code></small>`,
+    `<b>${name}</b>`,
+    // 倍率が同じ段階（偶数のみ・奇数のみ）は上下ではなく並列なので「／」でつなぐ。
+    roles
+      .map((role, index) => {
+        const text = `${role.stage ?? role.name} ${multiplierLabel(role.multiplier)}`;
+        if (index === 0) return text;
+        return `${roles[index - 1].multiplier === role.multiplier ? " ／ " : " → "}${text}`;
+      })
+      .join(""),
   ]),
 );
 
@@ -296,8 +301,8 @@ const COLOR_ROLE_FREQUENCY = { flush: "0.41%", four_flush: "5.87%", three_flush:
 table(
   document.querySelector("#color-roles-table"),
   ["役", "条件", "倍率", "単独成立率"],
-  COLOR_ROLES.map((role) => [
-    `<b>${role.name}</b>${role.minHandSize ? `<br /><small>最低${role.minHandSize}枚</small>` : ""}`,
+  [...COLOR_ROLES].sort((a, b) => a.multiplier - b.multiplier).map((role) => [
+    `<b>${ROLE_FAMILY_INFO.color.name}（${role.stage}）</b>${role.minHandSize ? `<br /><small>最低${role.minHandSize}枚</small>` : ""}`,
     role.description,
     `<b class="is-bonus">${multiplierLabel(role.multiplier)}</b>`,
     COLOR_ROLE_FREQUENCY[role.id] ?? "—",

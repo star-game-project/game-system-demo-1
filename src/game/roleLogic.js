@@ -127,7 +127,7 @@ function evaluateConcreteHand(values, handSize, families, colorMax = 0) {
   ).filter(Boolean);
 
   // 成立が他の系統を必ず含意する役は、その系統を打ち消す
-  // （SAME NUMBER は偶奇も必ず揃うため EVEN / ODD と重複させない）。
+  // （SET（全部同じ）は偶奇も必ず揃うため PARITY と重複させない）。
   const excluded = new Set(perFamily.flatMap((role) => role.excludes ?? []));
   const roles = perFamily.filter((role) => !excluded.has(role.family));
 
@@ -146,6 +146,7 @@ function evaluateConcreteHand(values, handSize, families, colorMax = 0) {
     roles: roles.map((role) => ({
       id: role.id,
       name: role.name,
+      stage: role.stage,
       multiplier: role.multiplier,
       family: role.family,
     })),

@@ -2,25 +2,30 @@
  * 役はゲーム全体のルールとして管理する。
  *
  * 役は family（系統）に属する。同じ family の役は互いに入れ子になっており
- * （PAIR ⊂ TWO PAIR ⊂ FULL HOUSE など）、まとめて掛けると同じ手札を
+ * （2枚 ⊂ 2組 ⊂ 3枚＋2枚 など）、まとめて掛けると同じ手札を
  * 多重に数えてしまうため、family ごとに最も倍率の高い役をひとつだけ採る。
  *
+ * 表示では、同じ family の役を1つの名前（name ＝ 系統名）にまとめ、
+ * 強い役が成立するほど同じ名前のまま倍率が上がる「段階」（stage）として見せる。
+ * 例）SET（2枚）×1.1 → SET（2組）×1.25 → … → SET（全部同じ）×2.5
+ *
  * 採用された役は family をまたいで掛け合わせる。
- * 例）3,3,3,1,1 → FULL HOUSE（set）× ODD（parity）
+ * 例）3,3,3,1,1 → SET（3枚＋2枚）× PARITY（奇数のみ）
  *
  * minHandSize は「手札全体」を条件にする役だけが持つ。
  *
  * ボーナス役の倍率は、旧値のボーナス部分（1を超える分）を半分にしたもの（例：×2.8 → ×1.9）。
  * 減算役（×0.5）は変えていない。
  *
- * EVEN / ODD はさらに ×1.9 → ×1.3 に下げている。デッキを偶奇に寄せるだけで成立率を100%にできる唯一の役で、
+ * PARITY（偶数のみ・奇数のみ）はさらに ×1.9 → ×1.3 に下げている。デッキを偶奇に寄せるだけで成立率を100%にできる唯一の役で、
  * 同じ寄せ方で同じ目の系統も成立しやすくなり掛け合わさるため、偶数のみのデッキが突出していた
  * （12枚・各目4枚以下での手札5枚の期待倍率：偶数のみ ×2.77 → ×1.90、均等 ×1.23 → ×1.21）。
  */
 export const HAND_ROLES = Object.freeze([
   {
     id: "same_number",
-    name: "SAME NUMBER",
+    name: "SET",
+    stage: "全部同じ",
     family: "set",
     multiplier: 2.5,
     kind: "bonus",
@@ -32,7 +37,8 @@ export const HAND_ROLES = Object.freeze([
   },
   {
     id: "four_of_a_kind",
-    name: "FOUR OF A KIND",
+    name: "SET",
+    stage: "4枚",
     family: "set",
     multiplier: 2.25,
     kind: "bonus",
@@ -41,7 +47,8 @@ export const HAND_ROLES = Object.freeze([
   },
   {
     id: "five_straight",
-    name: "FIVE STRAIGHT",
+    name: "STRAIGHT",
+    stage: "5連",
     family: "straight",
     multiplier: 1.7,
     kind: "bonus",
@@ -50,7 +57,8 @@ export const HAND_ROLES = Object.freeze([
   },
   {
     id: "full_house",
-    name: "FULL HOUSE",
+    name: "SET",
+    stage: "3枚＋2枚",
     family: "set",
     multiplier: 1.9,
     kind: "bonus",
@@ -59,7 +67,8 @@ export const HAND_ROLES = Object.freeze([
   },
   {
     id: "four_straight",
-    name: "FOUR STRAIGHT",
+    name: "STRAIGHT",
+    stage: "4連",
     family: "straight",
     multiplier: 1.35,
     kind: "bonus",
@@ -68,7 +77,8 @@ export const HAND_ROLES = Object.freeze([
   },
   {
     id: "three_of_a_kind",
-    name: "THREE OF A KIND",
+    name: "SET",
+    stage: "3枚",
     family: "set",
     multiplier: 1.5,
     kind: "bonus",
@@ -77,7 +87,8 @@ export const HAND_ROLES = Object.freeze([
   },
   {
     id: "even_only",
-    name: "EVEN",
+    name: "PARITY",
+    stage: "偶数のみ",
     family: "parity",
     multiplier: 1.3,
     kind: "bonus",
@@ -87,7 +98,8 @@ export const HAND_ROLES = Object.freeze([
   },
   {
     id: "odd_only",
-    name: "ODD",
+    name: "PARITY",
+    stage: "奇数のみ",
     family: "parity",
     multiplier: 1.3,
     kind: "bonus",
@@ -97,7 +109,8 @@ export const HAND_ROLES = Object.freeze([
   },
   {
     id: "three_straight",
-    name: "THREE STRAIGHT",
+    name: "STRAIGHT",
+    stage: "3連",
     family: "straight",
     multiplier: 1.15,
     kind: "bonus",
@@ -106,7 +119,8 @@ export const HAND_ROLES = Object.freeze([
   },
   {
     id: "two_pair",
-    name: "TWO PAIR",
+    name: "SET",
+    stage: "2組",
     family: "set",
     multiplier: 1.25,
     kind: "bonus",
@@ -115,7 +129,8 @@ export const HAND_ROLES = Object.freeze([
   },
   {
     id: "pair",
-    name: "PAIR",
+    name: "SET",
+    stage: "2枚",
     family: "set",
     multiplier: 1.1,
     kind: "bonus",
@@ -126,6 +141,7 @@ export const HAND_ROLES = Object.freeze([
     // 1・2・3 が揃うと減算。ただし 4 まで伸ばせば STRAIGHT として脱出できる。
     id: "one_two_three",
     name: "1-2-3",
+    // 段階が1つしかない減算役は、段階を添えずに名前だけで呼ぶ。
     family: "penalty",
     kind: "penalty",
     multiplier: 0.5,
@@ -138,14 +154,15 @@ export const HAND_ROLES = Object.freeze([
  * 色の役。ルール「ダイスの色（試作）」でだけ判定する（rolesFor）。
  * 同じ色の枚数で段階を付け、目の役とは系統（color）をまたいで掛け合わせる。
  * 倍率は、色が一様に付いた手札5枚での成立しやすさを目の役の並びに当てはめた仮の値：
- *   THREE FLUSH（同色がちょうど3枚）35.2% → PAIR 並み
- *   FOUR FLUSH（ちょうど4枚）5.9%       → THREE OF A KIND 並み
- *   FLUSH（5枚すべて）0.4%               → FULL HOUSE と FOUR OF A KIND の間
+ *   FLUSH（3枚）（同色がちょうど3枚）35.2% → SET（2枚）並み
+ *   FLUSH（4枚）（ちょうど4枚）5.9%       → SET（3枚）並み
+ *   FLUSH（全部）（5枚すべて）0.4%        → SET（3枚＋2枚）と SET（4枚）の間
  */
 export const COLOR_ROLES = Object.freeze([
   {
     id: "flush",
     name: "FLUSH",
+    stage: "全部",
     family: "color",
     multiplier: 2,
     kind: "bonus",
@@ -157,7 +174,8 @@ export const COLOR_ROLES = Object.freeze([
   },
   {
     id: "four_flush",
-    name: "FOUR FLUSH",
+    name: "FLUSH",
+    stage: "4枚",
     family: "color",
     multiplier: 1.5,
     kind: "bonus",
@@ -167,7 +185,8 @@ export const COLOR_ROLES = Object.freeze([
   },
   {
     id: "three_flush",
-    name: "THREE FLUSH",
+    name: "FLUSH",
+    stage: "3枚",
     family: "color",
     multiplier: 1.1,
     kind: "bonus",
@@ -197,15 +216,36 @@ export const PENALTY_ROLES = Object.freeze(
   HAND_ROLES.filter((role) => role.kind === "penalty"),
 );
 
-/** family ごとに、倍率の高い順に並べた役。 */
-export const ROLE_FAMILIES = Object.freeze(
-  [...new Set(HAND_ROLES.map((role) => role.family))].map((family) => ({
-    family,
-    roles: HAND_ROLES.filter((role) => role.family === family).sort(
-      (a, b) => b.multiplier - a.multiplier || b.priority - a.priority,
-    ),
-  })),
-);
+/** 系統の表示名（役の name と同じ）と、日本語の呼び方。並びは役一覧に出す順。 */
+export const ROLE_FAMILY_INFO = Object.freeze({
+  set: Object.freeze({ name: "SET", label: "同じ目" }),
+  straight: Object.freeze({ name: "STRAIGHT", label: "連番" }),
+  parity: Object.freeze({ name: "PARITY", label: "偶奇" }),
+  color: Object.freeze({ name: "FLUSH", label: "同じ色" }),
+  penalty: Object.freeze({ name: "1-2-3", label: "減算" }),
+});
+
+/** 役の表示名。系統名に段階を添える（例：SET（2組））。段階の無い減算役は名前だけ。 */
+export function roleLabel(role) {
+  return role.stage ? `${role.name}（${role.stage}）` : role.name;
+}
+
+/**
+ * そのルールの系統と、系統ごとの段階（弱い順）。役一覧はこの形で見せる。
+ * 段階の並びは強化前の倍率。倍率が同じ段階（偶数のみ・奇数のみ）は priority の順。
+ */
+export function roleFamiliesFor(ruleset = "standard") {
+  const roles = rolesFor(ruleset);
+  return Object.entries(ROLE_FAMILY_INFO)
+    .map(([family, info]) => ({
+      family,
+      ...info,
+      roles: roles
+        .filter((role) => role.family === family)
+        .sort((a, b) => a.multiplier - b.multiplier || a.priority - b.priority),
+    }))
+    .filter(({ roles: list }) => list.length > 0);
+}
 
 /** 倍率の高い順に並べた通常役。倍率が同じ場合は priority の高い方を先に見る。 */
 export const BONUS_ROLES = Object.freeze(

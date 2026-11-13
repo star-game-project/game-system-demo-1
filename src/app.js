@@ -12,7 +12,7 @@ import {
   DEFAULT_DECK_COUNTS,
   createDeckFromCounts,
 } from "./data/cards.js";
-import { PENALTY_ROLES, ROLE_BY_ID, ROLE_GROWTH, bonusRolesFor, upgradedMultiplier } from "./data/roles.js";
+import { ROLE_BY_ID, ROLE_FAMILY_INFO, ROLE_GROWTH, roleFamiliesFor, roleLabel, upgradedMultiplier } from "./data/roles.js";
 import {
   addCard,
   bucketLimit,
@@ -180,9 +180,10 @@ function multiplierLabel(value) {
 }
 
 /** 成立している役の名前。複数成立していれば「A × B」と並べる。 */
+/** 成立している役の表示名。系統名に段階を添え、系統をまたぐときは × でつなぐ（例：SET（2組） × PARITY（偶数のみ））。 */
 function roleNameLabel(role) {
   if (!role?.roles?.length) return role?.roleName || null;
-  return role.roles.map((entry) => entry.name).join(" × ");
+  return role.roles.map(roleLabel).join(" × ");
 }
 
 /** 倍率の内訳。複数成立時のみ「2.8 × 2.8」を返す。 */
@@ -693,23 +694,34 @@ function roleMultiplierText(role, levels = {}) {
   return level ? `${current} <small>(${multiplierLabel(role.multiplier)} Lv${level})</small>` : current;
 }
 
-/** rulesetId のルールで判定する役の一覧。「ダイスの色（試作）」なら色の役も並ぶ。 */
+/**
+ * rulesetId のルールで判定する役の一覧。系統ごとにまとめ、段階を弱い順に並べる。
+ * 「ダイスの色（試作）」なら色の系統（FLUSH）も並ぶ。
+ */
 function renderRoleTable(levels = {}, rulesetId = ruleset) {
-  // 倍率の高い順に並べ、減算役は最後にまとめる（並びは強化前の倍率）。
-  return [...bonusRolesFor(rulesetId), ...PENALTY_ROLES].map(
-    (role) => `
-      <div class="role-table__row ${role.kind === "penalty" ? "role-table__row--risk" : ""}">
-        <span>${role.name}</span>
-        <small>${role.description} · 系統 ${role.family}</small>
-        <b>${roleMultiplierText(role, levels)}</b>
+  return roleFamiliesFor(rulesetId).map(({ family, name, label, roles }) => {
+    const risk = family === "penalty";
+    const stages = roles.map(
+      (role) => `
+        <div class="role-table__row ${risk ? "role-table__row--risk" : ""}">
+          <span>${role.stage ?? role.name}</span>
+          <small>${role.description}</small>
+          <b>${roleMultiplierText(role, levels)}</b>
+        </div>
+      `,
+    ).join("");
+    return `
+      <div class="role-family ${risk ? "role-family--risk" : ""}">
+        <div class="role-family__head"><strong>${name}</strong><small>${label}</small></div>
+        ${stages}
       </div>
-    `,
-  ).join("");
+    `;
+  }).join("");
 }
 
 function roleRuleHint(rulesetId = ruleset) {
   const basis = rulesetId === "dice_color" ? "手札全体の目と色" : "手札全体の目";
-  return `${basis}で役が決まります。系統ごとに最も倍率の高い役を1つ採り、系統をまたいで倍率を掛け合わせます。`;
+  return `${basis}で役が決まります。役は系統ごとにまとめてあり、強い段階が成立するほど同じ名前のまま倍率が上がります。系統ごとに最も高い段階を1つ採り、系統をまたいで倍率を掛け合わせます。`;
 }
 
 /**
@@ -905,8 +917,8 @@ function renderReward() {
         <header>
           <span class="catalogue-card__die">×</span>
           <div>
-            <strong>${role.name} <small>Lv${level} → Lv${level + 1}</small></strong>
-            <small>${multiplierLabel(upgradedMultiplier(role, runRoleLevels))} → ${multiplierLabel(upgradedMultiplier(role, { [id]: level + 1 }))} / 系統 ${role.family}</small>
+            <strong>${roleLabel(role)} <small>Lv${level} → Lv${level + 1}</small></strong>
+            <small>${multiplierLabel(upgradedMultiplier(role, runRoleLevels))} → ${multiplierLabel(upgradedMultiplier(role, { [id]: level + 1 }))} / 系統 ${ROLE_FAMILY_INFO[role.family].label}</small>
           </div>
         </header>
         <span class="ability ability--none">${role.description}</span>
@@ -914,7 +926,7 @@ function renderReward() {
       </article>
     `;
   }).join("");
-  const roleText = roleKey ? `${ROLE_BY_ID[roleKey].name} を強化` : "強化しない";
+  const roleText = roleKey ? `${roleLabel(ROLE_BY_ID[roleKey])} を強化` : "強化しない";
 
   const gainColor = gainKey ? reward.offerColors?.[offers.indexOf(gainKey)] : null;
   const removeColor = removeKey && reward.removeIndex !== null ? runColors?.[removeKey]?.[reward.removeIndex] : null;

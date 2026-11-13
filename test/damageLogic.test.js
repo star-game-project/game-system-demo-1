@@ -33,7 +33,7 @@ test("passive and temporary bonuses are added before the role multiplier", () =>
 
   assert.equal(result.passiveBonus, 5);
   assert.equal(result.temporaryBonus, 5);
-  assert.equal(result.roleName, "ODD");
+  assert.equal(result.roleId, "odd_only");
   assert.equal(result.roleMultiplier, 1.3);
   // (10 + 5 + 5) × 1.3 = 26
   assert.equal(result.finalAttack, 26);

@@ -855,8 +855,9 @@ function renderRulesetPicker() {
   const handSizes = hasRule(ruleset, "select_play")
     ? `
       <div class="ruleset-picker__hand-size">
-        <span>手札の枚数（毎ターン引き直す）</span>
+        <span class="ruleset-picker__setting-label">手札の枚数</span>
         ${SELECT_PLAY_HAND_SIZES.map((size) => `<button class="command-button command-button--secondary ${size === selectHandSize ? "is-active" : ""}" data-hand-size="${size}" aria-pressed="${size === selectHandSize}">${size}枚</button>`).join("")}
+        <small>毎ターンこの枚数を引き直す</small>
       </div>
     `
     : "";
@@ -864,10 +865,11 @@ function renderRulesetPicker() {
   const colorCounts = hasRule(ruleset, "dice_color")
     ? `
       <div class="ruleset-picker__hand-size">
-        <span>色の数（${diceColorsFor(diceColorCount).map((color) => color.label).join("・")}）</span>
+        <span class="ruleset-picker__setting-label">色の数</span>
         ${Array.from({ length: DICE_COLOR_COUNT.MAX - DICE_COLOR_COUNT.MIN + 1 }, (_, index) => DICE_COLOR_COUNT.MIN + index)
           .map((count) => `<button class="command-button command-button--secondary ${count === diceColorCount ? "is-active" : ""}" data-color-count="${count}" aria-pressed="${count === diceColorCount}">${count}色</button>`)
           .join("")}
+        <small>${diceColorsFor(diceColorCount).map((color) => color.label).join("・")}</small>
       </div>
     `
     : "";

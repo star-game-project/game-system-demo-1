@@ -1969,4 +1969,13 @@ a:focus-visible {
 .field-card.dice-accent--orange { --card-accent: #ff9b4a; }
 
 .ruleset-picker__hand-size { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 10px; font-size: 12px; color: var(--muted); }
+/* 見出しの幅をそろえ、ボタンの位置が行ごと・選択ごとに動かないようにする（変わる説明は右側に置く）。 */
+.ruleset-picker__setting-label { min-width: 6em; }
+.ruleset-picker__hand-size small { font-size: 11px; }
+/* 選んでいる設定は、ルールのボタン（.ruleset-option.is-active）と同じ色で示す。 */
+.ruleset-picker__hand-size .command-button.is-active {
+  border-color: var(--cyan);
+  color: var(--cyan);
+  background: color-mix(in srgb, var(--cyan) 12%, transparent);
+}
 .ruleset-picker__note { margin: 10px 0 0; font-size: 11px; color: var(--muted); }

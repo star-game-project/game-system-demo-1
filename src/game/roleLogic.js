@@ -22,7 +22,7 @@ const MAX_WILD_SEARCH = 4;
 
 /**
  * family ごとに、レベル反映後の倍率が高い順に並べた役。
- * 強化で下位の役が上位を追い越すこともあるため、レベルごとに並べ直す。
+ * 強化は系統の全段階に同じだけ足すので、系統の中の並びは強化しても変わらない。
  * ruleset が「ダイスの色（試作）」なら色の役（color 系統）も加わる。
  */
 function familiesFor(levels, ruleset) {
@@ -175,7 +175,7 @@ function largestColorGroup(hand) {
 }
 
 /**
- * levels は役の強化レベル（{ 役id: レベル }）。省略時は強化なし。
+ * levels は系統ごとの強化レベル（{ 系統: レベル }）。省略時は強化なし。
  * ruleset は遊んでいるルール（rulesets.js）。「ダイスの色（試作）」のときだけ色の役を判定する。
  */
 export function evaluateHandRole(hand, levels = {}, ruleset = "standard") {

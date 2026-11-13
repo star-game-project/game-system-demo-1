@@ -21,7 +21,7 @@ export const DECK_RULES = Object.freeze({
 
 /**
  * 勝利後の報酬。候補からカードを1枚まで入手し、デッキから1枚まで削除し、
- * 候補の役を1つまで強化できる（いずれも任意で、同時に選べる）。
+ * 候補の系統を1つまで強化できる（いずれも任意で、同時に選べる）。
  */
 export const REWARD_RULES = Object.freeze({
   OFFER_COUNT: 3,

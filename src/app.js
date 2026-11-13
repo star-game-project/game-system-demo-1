@@ -687,11 +687,10 @@ function renderCatalogue() {
   }).join("");
 }
 
-/** 強化レベルを含む倍率の表記。強化済みなら元の倍率とレベルも添える。 */
+/** 強化レベルを含む倍率の表記。強化済みなら元の倍率も添える（レベルは系統の見出しに出す）。 */
 function roleMultiplierText(role, levels = {}) {
-  const level = levels[role.id] ?? 0;
   const current = multiplierLabel(upgradedMultiplier(role, levels));
-  return level ? `${current} <small>(${multiplierLabel(role.multiplier)} Lv${level})</small>` : current;
+  return role.kind === "bonus" && levels[role.family] ? `${current} <small>(${multiplierLabel(role.multiplier)})</small>` : current;
 }
 
 /**
@@ -712,7 +711,7 @@ function renderRoleTable(levels = {}, rulesetId = ruleset) {
     ).join("");
     return `
       <div class="role-family ${risk ? "role-family--risk" : ""}">
-        <div class="role-family__head"><strong>${name}</strong><small>${label}</small></div>
+        <div class="role-family__head"><strong>${name}</strong><small>${label}${levels[family] ? ` · Lv${levels[family]}（全段階 +${Number((levels[family] * ROLE_GROWTH.UPGRADE_STEP).toFixed(2))}）` : ""}</small></div>
         ${stages}
       </div>
     `;
@@ -908,25 +907,34 @@ function renderReward() {
   const itemText = itemKey ? `${ITEM_BY_ID[itemKey].name} を入手` : "アイテムなし";
 
   const { roleOffers, roleKey } = reward;
+  // 強化は系統単位。候補の id は系統（"set" など）で、その系統の全段階の倍率が上がる。
+  const familyById = Object.fromEntries(roleFamiliesFor(engine.state.ruleset).map((entry) => [entry.family, entry]));
   const roleCards = roleOffers.map((id) => {
-    const role = ROLE_BY_ID[id];
+    const { name, label, roles } = familyById[id];
     const level = runRoleLevels[id] ?? 0;
+    const next = { ...runRoleLevels, [id]: level + 1 };
+    const range = (levels) => {
+      const values = roles.map((role) => upgradedMultiplier(role, levels));
+      const low = multiplierLabel(Math.min(...values));
+      const high = multiplierLabel(Math.max(...values));
+      return low === high ? low : `${low}〜${high}`;
+    };
     const selected = roleKey === id;
     return `
       <article class="catalogue-card ${selected ? "is-included reward-card--selected" : ""}">
         <header>
           <span class="catalogue-card__die">×</span>
           <div>
-            <strong>${roleLabel(role)} <small>Lv${level} → Lv${level + 1}</small></strong>
-            <small>${multiplierLabel(upgradedMultiplier(role, runRoleLevels))} → ${multiplierLabel(upgradedMultiplier(role, { [id]: level + 1 }))} / 系統 ${ROLE_FAMILY_INFO[role.family].label}</small>
+            <strong>${name} <small>Lv${level} → Lv${level + 1}</small></strong>
+            <small>${range(runRoleLevels)} → ${range(next)} / 系統 ${label}</small>
           </div>
         </header>
-        <span class="ability ability--none">${role.description}</span>
-        <button type="button" class="command-button command-button--secondary" data-reward-role="${id}">${selected ? "選択中（もう一度で解除）" : "この役を強化"}</button>
+        <span class="ability ability--none">全段階の倍率 +${ROLE_GROWTH.UPGRADE_STEP}：${roles.map((role) => role.stage).join("・")}</span>
+        <button type="button" class="command-button command-button--secondary" data-reward-role="${id}">${selected ? "選択中（もう一度で解除）" : "この系統を強化"}</button>
       </article>
     `;
   }).join("");
-  const roleText = roleKey ? `${roleLabel(ROLE_BY_ID[roleKey])} を強化` : "強化しない";
+  const roleText = roleKey ? `${ROLE_FAMILY_INFO[roleKey].name} を強化` : "強化しない";
 
   const gainColor = gainKey ? reward.offerColors?.[offers.indexOf(gainKey)] : null;
   const removeColor = removeKey && reward.removeIndex !== null ? runColors?.[removeKey]?.[reward.removeIndex] : null;
@@ -949,7 +957,7 @@ function renderReward() {
 
       <section class="point-rules">
         <div><span class="eyebrow">RUN STATUS</span><strong>HP ${playerHp} / ${GAME_CONFIG.PLAYER_MAX_HP}（回復なし） · デッキ ${countCards(runCounts)}枚 → ${countCards(result)}枚 · アイテム ${runItems.length} / ${ITEM_RULES.MAX_HELD}（${heldItems}）</strong></div>
-        <small>候補${REWARD_RULES.OFFER_COUNT}枚から${REWARD_RULES.MAX_GAINS}枚まで入手し、デッキから${REWARD_RULES.MAX_REMOVALS}枚まで削除し、候補${REWARD_RULES.ROLE_OFFER_COUNT}つの役から${REWARD_RULES.MAX_ROLE_UPGRADES}つまで強化できます（いずれも任意）。削除は${DECK_RULES.MIN_DECK_SIZE}枚を下回らない範囲で行えます。</small>
+        <small>候補${REWARD_RULES.OFFER_COUNT}枚から${REWARD_RULES.MAX_GAINS}枚まで入手し、デッキから${REWARD_RULES.MAX_REMOVALS}枚まで削除し、候補${REWARD_RULES.ROLE_OFFER_COUNT}つの系統から${REWARD_RULES.MAX_ROLE_UPGRADES}つまで強化できます（いずれも任意）。削除は${DECK_RULES.MIN_DECK_SIZE}枚を下回らない範囲で行えます。</small>
       </section>
 
       <section class="catalogue">
@@ -968,7 +976,7 @@ function renderReward() {
       </section>
 
       <section class="catalogue">
-        <div class="build-heading"><div><span class="eyebrow">ROLE UPGRADE</span><h2>役の強化（1つまで・倍率 +${ROLE_GROWTH.UPGRADE_STEP}）</h2></div></div>
+        <div class="build-heading"><div><span class="eyebrow">ROLE UPGRADE</span><h2>役の強化（1系統まで・その系統の全段階に倍率 +${ROLE_GROWTH.UPGRADE_STEP}）</h2></div></div>
         <div class="catalogue-grid">${roleCards}</div>
       </section>
 

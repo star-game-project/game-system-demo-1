@@ -115,29 +115,30 @@ test("a wild die is never used to complete the 1-2-3 penalty", () => {
   assert.ok(ids(1, 2, 3, 6).includes("one_two_three"));
 });
 
-test("an upgraded role adds the growth step per level to its multiplier", () => {
-  const levels = { pair: 2 };
+test("an upgraded family adds the growth step per level to its multiplier", () => {
+  const levels = { set: 2 };
   assert.equal(evaluateHandRole(hand(2, 2, 5), levels).multiplier, 1.1 + 2 * ROLE_GROWTH.UPGRADE_STEP);
   assert.equal(evaluateHandRole(hand(2, 2, 5)).multiplier, 1.1, "no levels means the base multiplier");
 });
 
-test("an upgraded lower role can overtake a higher one in the same family", () => {
-  // TWO PAIR ×1.25 も成立するが、PAIR を ×1.3 まで上げると PAIR の方が高い。
-  const result = evaluateHandRole(hand(2, 2, 5, 5, 1), { pair: 2 });
-  assert.equal(result.roleId, "pair");
-  assert.equal(result.multiplier, 1.3);
-  assert.equal(evaluateHandRole(hand(2, 2, 5, 5, 1)).roleId, "two_pair");
+test("upgrading a family raises every stage alike, so the stage reached stays the same", () => {
+  // 2,2,5,5,1 は SET（2組）。系統を2上げると、2組のまま ×1.25 → ×1.45。
+  const result = evaluateHandRole(hand(2, 2, 5, 5, 1), { set: 2 });
+  assert.equal(result.roleId, "two_pair");
+  assert.equal(result.multiplier, 1.45);
+  // 別の系統の強化は掛からない。
+  assert.equal(evaluateHandRole(hand(2, 2, 5, 5, 1), { straight: 3 }).multiplier, 1.25);
 });
 
 test("the penalty role cannot be upgraded", () => {
-  assert.equal(evaluateHandRole(hand(1, 2, 3, 6, 6), { one_two_three: 5 }).roles.find((role) => role.id === "one_two_three").multiplier, 0.5);
+  assert.equal(evaluateHandRole(hand(1, 2, 3, 6, 6), { penalty: 5 }).roles.find((role) => role.id === "one_two_three").multiplier, 0.5);
 });
 
 test("a wild die follows upgraded multipliers when picking its value", () => {
   // 2,3,4 + ワイルド：通常は 1 か 5 にして FOUR STRAIGHT ×1.35。
-  // PAIR を ×1.6 まで上げると、2〜4 のどれかにして PAIR × THREE STRAIGHT の方が高くなる。
+  // SET を5上げて SET（2枚）が ×1.6 になると、2〜4 のどれかにして SET（2枚）× STRAIGHT（3連）の方が高くなる。
   assert.equal(evaluateHandRole(withWild(2, 3, 4)).roleId, "four_straight");
-  const upgraded = evaluateHandRole(withWild(2, 3, 4), { pair: 5 });
+  const upgraded = evaluateHandRole(withWild(2, 3, 4), { set: 5 });
   assert.deepEqual(upgraded.roles.map((role) => role.id).sort(), ["pair", "three_straight"]);
   assert.equal(upgraded.multiplier, product(1.6, 1.15));
 });

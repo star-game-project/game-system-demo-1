@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { CARD_BY_KEY, CARD_CATALOGUE, DEFAULT_DECK_COUNTS } from "../src/data/cards.js";
 import { DECK_RULES, REWARD_RULES } from "../src/data/constants.js";
-import { BONUS_ROLES } from "../src/data/roles.js";
+import { upgradableFamiliesFor } from "../src/data/roles.js";
 import {
   applyReward,
   applyRoleUpgrade,
@@ -72,7 +72,7 @@ test("removal cannot shrink the deck below the minimum size", () => {
   assert.equal(canRemoveFromRun(atMinimum, "guard"), false, "a card not in the deck cannot be removed");
 });
 
-test("role offers are distinct bonus roles, never the penalty", () => {
+test("role offers are distinct families that can be upgraded, never the penalty", () => {
   let state = 3;
   const random = () => {
     state = (state * 16807) % 2147483647;
@@ -85,15 +85,16 @@ test("role offers are distinct bonus roles, never the penalty", () => {
     assert.equal(new Set(offers).size, offers.length);
     offers.forEach((id) => seen.add(id));
   }
-  assert.ok(!seen.has("one_two_three"));
-  assert.deepEqual([...seen].sort(), BONUS_ROLES.map((role) => role.id).sort());
+  assert.ok(!seen.has("penalty"));
+  assert.deepEqual([...seen].sort(), ["parity", "set", "straight"]);
+  assert.deepEqual(upgradableFamiliesFor("standard").map(({ family }) => family).sort(), [...seen].sort());
 });
 
-test("upgrading a role raises its level by one and is optional", () => {
-  const levels = { pair: 1 };
-  assert.deepEqual(applyRoleUpgrade(levels, ["pair", "odd_only"], "pair"), { pair: 2 });
-  assert.deepEqual(applyRoleUpgrade(levels, ["pair", "odd_only"], "odd_only"), { pair: 1, odd_only: 1 });
-  assert.deepEqual(applyRoleUpgrade(levels, ["pair"], null), levels);
-  assert.deepEqual(applyRoleUpgrade(levels, ["pair"], "full_house"), levels, "only an offered role can be upgraded");
-  assert.deepEqual(levels, { pair: 1 }, "the input levels are not mutated");
+test("upgrading a family raises its level by one and is optional", () => {
+  const levels = { set: 1 };
+  assert.deepEqual(applyRoleUpgrade(levels, ["set", "parity"], "set"), { set: 2 });
+  assert.deepEqual(applyRoleUpgrade(levels, ["set", "parity"], "parity"), { set: 1, parity: 1 });
+  assert.deepEqual(applyRoleUpgrade(levels, ["set"], null), levels);
+  assert.deepEqual(applyRoleUpgrade(levels, ["set"], "straight"), levels, "only an offered family can be upgraded");
+  assert.deepEqual(levels, { set: 1 }, "the input levels are not mutated");
 });

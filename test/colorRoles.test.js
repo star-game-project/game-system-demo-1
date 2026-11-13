@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { COLOR_ROLES, bonusRolesFor, rolesFor, HAND_ROLES } from "../src/data/roles.js";
+import { COLOR_ROLES, rolesFor, HAND_ROLES, upgradableFamiliesFor } from "../src/data/roles.js";
 import { evaluateHandRole } from "../src/game/roleLogic.js";
 import { drawRoleOffers } from "../src/game/rewardLogic.js";
 import { createInitialGameState } from "../src/game/gameState.js";
@@ -67,22 +67,22 @@ test("a wild die keeps its own colour while standing in for any face", () => {
   assert.ok(ids(evaluateHandRole(cards, {}, PROTO)).includes("three_flush"));
 });
 
-test("upgrading a colour role raises it like any bonus role", () => {
+test("upgrading the colour family raises it like any other family", () => {
   const three = hand([1, "red"], [4, "red"], [6, "red"], [1, "blue"], [4, "green"]);
   const base = evaluateHandRole(three, {}, PROTO);
-  const upgraded = evaluateHandRole(three, { three_flush: 2 }, PROTO);
+  const upgraded = evaluateHandRole(three, { color: 2 }, PROTO);
   assert.ok(upgraded.multiplier > base.multiplier);
 });
 
-test("colour roles are offered as upgrades only under the prototype", () => {
-  const standardPool = bonusRolesFor("standard").map((role) => role.id);
-  const protoPool = bonusRolesFor(PROTO).map((role) => role.id);
-  assert.equal(standardPool.some((id) => id.endsWith("flush")), false);
-  assert.ok(["flush", "four_flush", "three_flush"].every((id) => protoPool.includes(id)));
+test("the colour family is offered as an upgrade only under the prototype", () => {
+  const standardPool = upgradableFamiliesFor("standard").map(({ family }) => family);
+  const protoPool = upgradableFamiliesFor(PROTO).map(({ family }) => family);
+  assert.equal(standardPool.includes("color"), false);
+  assert.ok(protoPool.includes("color"));
 
   const offers = drawRoleOffers(() => 0.5, protoPool.length, PROTO);
   assert.deepEqual([...offers].sort(), [...protoPool].sort());
-  assert.equal(drawRoleOffers(() => 0.5, 99, "standard").some((id) => id.endsWith("flush")), false);
+  assert.equal(drawRoleOffers(() => 0.5, 99, "standard").includes("color"), false);
 });
 
 test("without coloured cards the prototype scores exactly like the current rules", () => {

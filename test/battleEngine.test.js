@@ -667,16 +667,16 @@ test("a fresh run starts at battle one with full HP", () => {
 test("role levels carried into a battle raise the attack preview", () => {
   const plain = engineWithHand([card("a", 4, { attack: 10 }), card("b", 4), card("c", 1)]);
   const upgraded = engineWithHand([card("a", 4, { attack: 10 }), card("b", 4), card("c", 1)]);
-  upgraded.state.roleLevels = { pair: 4 };
+  upgraded.state.roleLevels = { set: 4 };
 
-  // 4,4,1 は PAIR。×1.1 と ×1.5（+0.1 × 4）。
+  // 4,4,1 は SET（2枚）。×1.1 と ×1.5（+0.1 × 4）。
   assert.equal(plain.getAttackPreview("a").finalAttack, Math.round(10 * 1.1));
   assert.equal(upgraded.getAttackPreview("a").finalAttack, Math.round(10 * 1.5));
 });
 
 test("a new battle starts with the carried role levels", () => {
-  const state = twentyCardState({ roleLevels: { odd_only: 2 } });
-  assert.deepEqual(state.roleLevels, { odd_only: 2 });
+  const state = twentyCardState({ roleLevels: { parity: 2 } });
+  assert.deepEqual(state.roleLevels, { parity: 2 });
   assert.deepEqual(twentyCardState().roleLevels, {});
 });
 

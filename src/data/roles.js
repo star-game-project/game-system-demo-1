@@ -216,7 +216,7 @@ export const PENALTY_ROLES = Object.freeze(
   HAND_ROLES.filter((role) => role.kind === "penalty"),
 );
 
-/** 系統の表示名（役の name と同じ）と、日本語の呼び方。並びは役一覧に出す順。 */
+/** 系統の表示名（役の name と同じ）と、日本語の呼び方。並びは役一覧に出す順。キーは強化レベルのキーにもなる。 */
 export const ROLE_FAMILY_INFO = Object.freeze({
   set: Object.freeze({ name: "SET", label: "同じ目" }),
   straight: Object.freeze({ name: "STRAIGHT", label: "連番" }),
@@ -255,7 +255,8 @@ export const BONUS_ROLES = Object.freeze(
 );
 
 /**
- * 役の強化（成長）。報酬で選んだボーナス役のレベルを1上げ、倍率に UPGRADE_STEP を足す。
+ * 役の強化（成長）。報酬で選んだ系統のレベルを1上げ、その系統の全段階の倍率に UPGRADE_STEP を足す。
+ * 役を系統ごとに1つの名前で見せているため、強化も系統単位にしている（段階ごとには上げない）。
  * 系統をまたいで倍率は掛け合わさるため、強化は掛け算ではなく足し算にしている。
  * 減算役は強化の対象外。上げ幅は当面一律（成立しやすさに合わせた調整は今後）。
  */
@@ -263,9 +264,14 @@ export const ROLE_GROWTH = Object.freeze({
   UPGRADE_STEP: 0.1,
 });
 
-/** レベルを反映した倍率。levels は { 役id: レベル }。 */
+/** レベルを反映した倍率。levels は { 系統: レベル }（例：{ set: 2 }）。 */
 export function upgradedMultiplier(role, levels = {}) {
   if (role.kind !== "bonus") return role.multiplier;
-  const level = levels[role.id] ?? 0;
+  const level = levels[role.family] ?? 0;
   return Number((role.multiplier + level * ROLE_GROWTH.UPGRADE_STEP).toFixed(3));
+}
+
+/** 強化できる系統（ボーナス役を持つ系統）。「ダイスの色（試作）」では色の系統も加わる。 */
+export function upgradableFamiliesFor(ruleset = "standard") {
+  return roleFamiliesFor(ruleset).filter(({ roles }) => roles.some((role) => role.kind === "bonus"));
 }

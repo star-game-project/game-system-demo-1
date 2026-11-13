@@ -1,5 +1,5 @@
 import { CARD_BY_KEY, CARD_CATALOGUE } from "../data/cards.js";
-import { bonusRolesFor } from "../data/roles.js";
+import { upgradableFamiliesFor } from "../data/roles.js";
 import { DECK_RULES, REWARD_RULES } from "../data/constants.js";
 import { shuffleDeck } from "./deckLogic.js";
 
@@ -35,18 +35,19 @@ export function applyReward(counts, offers, { gainKey = null, removeKey = null }
 }
 
 /**
- * 役の強化の候補。そのルールのボーナス役から重複なしで等確率に選ぶ（減算役は対象外）。
- * 「ダイスの色（試作）」では色の役も候補に入る。
+ * 役の強化の候補。そのルールの強化できる系統から重複なしで等確率に選ぶ（減算役は対象外）。
+ * 現行ルールは系統が3つなので、候補3つなら毎回すべての系統が並ぶ。
+ * 「ダイスの色（試作）」では色の系統も候補に入る。
  */
 export function drawRoleOffers(
   random = Math.random,
   count = REWARD_RULES.ROLE_OFFER_COUNT,
   ruleset = "standard",
 ) {
-  return shuffleDeck(bonusRolesFor(ruleset).map((role) => role.id), random).slice(0, count);
+  return shuffleDeck(upgradableFamiliesFor(ruleset).map(({ family }) => family), random).slice(0, count);
 }
 
-/** 役の強化を確定する。候補にない役は強化しない。 */
+/** 役の強化を確定する。roleKey は系統（例："set"）。候補にない系統は強化しない。 */
 export function applyRoleUpgrade(levels, roleOffers, roleKey = null) {
   if (!roleKey || !roleOffers.includes(roleKey)) return { ...levels };
   return { ...levels, [roleKey]: (levels[roleKey] ?? 0) + 1 };

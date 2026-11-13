@@ -367,13 +367,20 @@ function renderField(state) {
   const field = engine.getFieldPreview();
   const targetName = (entry) =>
     entry.targetId === "all" ? "全体" : state.enemies.find((enemy) => enemy.id === entry.targetId)?.name ?? "—";
-  const rows = field.results.map((entry) => `
-    <li class="field-card">
-      <strong>${entry.card.name}</strong>
-      <small>${isDefenseCard(entry.card) ? `DEF ${entry.card.defense}` : `ATK ${entry.attack} → ${targetName(entry)}`}</small>
-      <b>${isDefenseCard(entry.card) ? `+${entry.shield}` : `${entry.damage}`}</b>
+  // 役は場のカードの目（と色）で決まるので、出したカードごとに目と色を見せる。
+  const rows = field.results.map((entry) => {
+    const { card } = entry;
+    const wild = isWildCard(card);
+    return `
+    <li class="field-card die-${card.dieValue} ${card.color ? `dice-accent--${card.color}` : ""}"
+      aria-label="${card.name}、目${wild ? "ワイルド" : card.dieValue}${card.color ? `、${DICE_COLOR_BY_ID[card.color].label}` : ""}">
+      <span class="field-card__die" aria-hidden="true">${wild ? "◈" : DIE_FACES[card.dieValue]}</span>
+      <strong>${card.name} ${colorChip(card.color)}</strong>
+      <small>${isDefenseCard(card) ? `DEF ${card.defense}` : `ATK ${entry.attack} → ${targetName(entry)}`}</small>
+      <b>${isDefenseCard(card) ? `+${entry.shield}` : `${entry.damage}`}</b>
     </li>
-  `).join("");
+  `;
+  }).join("");
   return `
     <div class="field-zone">
       <div class="field-zone__head">

@@ -85,6 +85,12 @@ let pointRules = { ...DEFAULT_POINT_RULES };
 let ruleset = DEFAULT_RULESET_ID;
 // 戦術カードの対象選択中だけ保持する UI 状態。
 let pendingTactical = null;
+// カードはダブルクリックで使う（確定ボタンはない）。1回目のクリックで選び、右の欄で内訳を確認できる。
+// クリックのたびに再描画で要素が作り直されるので、ダブルクリックは要素ではなくカードの id と時刻で判定する。
+const DOUBLE_CLICK_MS = 400;
+let lastCardClick = { cardId: null, at: 0 };
+// カードを使った直後は、ダブルクリックの残りのクリックを無視する（使ったカードの位置に別のカードが来るため）。
+let ignoreCardClicksUntil = 0;
 // 連戦中のデッキ（カードごとの枚数）。構築画面のデッキから始まり、報酬で入手・削除して育つ。
 let runCounts = null;
 // 連戦中の役の強化レベル（{ 役id: レベル }）。報酬で上がり、1戦目からやり直すと消える。
@@ -615,15 +621,18 @@ function renderCommands(state) {
         ? "使用するカードを選択"
         : "使えるカードがありません";
     const fieldRule = engine.isSelectPlay();
-    const detail = fieldRule
+    const howTo = selected
+      ? `もう一度すばやく押す（ダブルクリック）で${fieldRule ? "場に出す" : "使う"}`
+      : `カードをダブルクリックで${fieldRule ? "場に出す" : "使う"}（1回押すと選んで内訳を確認できる）`;
+    const detail = `${howTo} — ${fieldRule
       ? selected
-        ? "場に出します。処理はターン終了時で、場のカード全体の役の倍率が掛かります"
+        ? "処理はターン終了時で、場のカード全体の役の倍率が掛かります"
         : "ポイントが続く限り何枚でも場に出せます。END TURN で場のカードをまとめて処理します"
       : selected
         ? defending
           ? `シールド +${selected.defense}（役の倍率は掛かりません）`
           : "使用前の手札で役を判定します"
-        : "ポイントが続く限り何枚でも使えます。終わったら END TURN";
+        : "ポイントが続く限り何枚でも使えます。終わったら END TURN"}`;
     return `
       <div class="command-copy">
         <span class="command-step">${engine.isSelectPlay() ? "01 / 01" : "02 / 02"}</span>
@@ -631,7 +640,6 @@ function renderCommands(state) {
       </div>
       <div class="command-actions">
         <button class="command-button command-button--danger" data-action="end-turn">END TURN</button>
-        <button class="command-button command-button--attack" data-action="attack" ${selected ? "" : "disabled"}><span>EXECUTE</span><small>${defending ? "DEFEND" : "ATTACK"}</small></button>
       </div>
     `;
   }
@@ -1192,9 +1200,19 @@ function handleCardClick(cardId) {
   const state = engine.state;
   if (state.phase !== PHASES.CARD_SELECT) return;
 
+  const now = Date.now();
+  if (now < ignoreCardClicksUntil) return;
+  const isDouble = lastCardClick.cardId === cardId && now - lastCardClick.at <= DOUBLE_CLICK_MS;
+  lastCardClick = isDouble ? { cardId: null, at: 0 } : { cardId, at: now };
+  const swallowTrailingClick = () => {
+    ignoreCardClicksUntil = now + DOUBLE_CLICK_MS;
+  };
+
   // 対象選択中：ソースをもう一度押すとキャンセル、それ以外は対象のトグル。
   if (pendingTactical) {
     if (cardId === pendingTactical.cardId) {
+      // ダブルクリックの2回目で、入ったばかりの対象選択を取り消さない。
+      if (isDouble) return;
       cancelTargeting();
       render();
       return;
@@ -1215,6 +1233,7 @@ function handleCardClick(cardId) {
       );
       cancelTargeting();
       if (!played) return;
+      swallowTrailingClick();
     }
     render();
     return;
@@ -1225,7 +1244,7 @@ function handleCardClick(cardId) {
 
   if (isTacticalCard(card)) {
     if (requiredTargetCount(card) === 0) {
-      engine.playTacticalCard(cardId, []);
+      if (engine.playTacticalCard(cardId, [])) swallowTrailingClick();
       render();
       return;
     }
@@ -1234,6 +1253,16 @@ function handleCardClick(cardId) {
     return;
   }
 
+  // 攻撃・防御カード：1回目で選び、すばやくもう一度押す（ダブルクリック）と使う。
+  if (isDouble && state.selectedCardId === cardId) {
+    if (engine.useSelectedCard()) {
+      cancelTargeting();
+      swallowTrailingClick();
+      // ターンは続く。勝利したときだけ結果を表示する。
+      render();
+    }
+    return;
+  }
   if (engine.selectCard(cardId)) render();
 }
 
@@ -1387,11 +1416,6 @@ function bindEvents() {
       if (action === "skip" && engine.chooseDraw(false)) render();
       if (action === "cancel-tactical") {
         cancelTargeting();
-        render();
-      }
-      if (action === "attack" && engine.useSelectedCard()) {
-        cancelTargeting();
-        // ターンは続く。勝利したときだけ結果を表示する。
         render();
       }
       if (action === "end-turn" && engine.endTurn()) {

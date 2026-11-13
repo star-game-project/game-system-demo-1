@@ -809,6 +809,8 @@ a:focus-visible {
 }
 
 .battle-card {
+  /* ダブルクリックで使うので、文字が選択されないようにする。 */
+  user-select: none;
   --card-accent: var(--blue);
   width: var(--card-width);
   min-width: var(--card-width);

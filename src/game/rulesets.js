@@ -1,4 +1,4 @@
-import { PHASES } from "../data/constants.js";
+import { GAME_CONFIG, PHASES } from "../data/constants.js";
 
 /**
  * デモで遊び比べるルール。デッキ構築画面で選び、連戦中は変えない。
@@ -41,4 +41,17 @@ export function normalizeRulesetId(id) {
  */
 export function turnStartPhase(rulesetId) {
   return rulesetId === "select_play" ? PHASES.CARD_SELECT : PHASES.DRAW_SELECT;
+}
+
+/**
+ * 「選んで出す（試作）」の手札の枚数。ドロー選択がない代わりに、構築画面で 6枚 / 7枚 から選ぶ（デモ限定）。
+ * ほかのルールは GAME_CONFIG.START_HAND_SIZE（5枚）のまま。
+ */
+export const SELECT_PLAY_HAND_SIZES = Object.freeze([6, 7]);
+export const DEFAULT_SELECT_PLAY_HAND_SIZE = 6;
+
+/** そのルールで毎ターン引き直す手札の枚数。chosen は構築画面で選んだ枚数（「選んで出す（試作）」のときだけ使う）。 */
+export function handSizeFor(rulesetId, chosen = DEFAULT_SELECT_PLAY_HAND_SIZE) {
+  if (rulesetId !== "select_play") return GAME_CONFIG.START_HAND_SIZE;
+  return SELECT_PLAY_HAND_SIZES.includes(chosen) ? chosen : DEFAULT_SELECT_PLAY_HAND_SIZE;
 }

@@ -4,7 +4,7 @@ import { createEnemies } from "../data/enemies.js";
 import { drawCards, shuffleDeck } from "./deckLogic.js";
 import { evaluateHandRole } from "./roleLogic.js";
 import { DEFAULT_POINT_RULES, normalizePointRules } from "./pointRules.js";
-import { DEFAULT_RULESET_ID, normalizeRulesetId, turnStartPhase } from "./rulesets.js";
+import { DEFAULT_RULESET_ID, handSizeFor, normalizeRulesetId, turnStartPhase } from "./rulesets.js";
 
 /** 1ターン中に使ったカードの合計。ターン開始時に作り直す。 */
 export function createTurnTotals() {
@@ -15,7 +15,8 @@ export function createTurnTotals() {
  * 戦闘の初期状態。連戦では battle（何戦目か）と playerHp（前の戦闘の残りHP）を引き継ぐ。
  * それ以外（山札・ポイント・CPU）は毎戦リセットする。pointRules は構築画面で選んだポイント設定、
  * roleLevels は報酬で強化した系統ごとのレベル（{ set: 2 } など）、ruleset は構築画面で選んだルール（rulesets.js）、
- * items は持っているアイテム（id の配列。連戦中に持ち越す）。
+ * items は持っているアイテム（id の配列。連戦中に持ち越す）。handSize は「選んで出す（試作）」の手札の枚数
+ * （構築画面で選ぶ。ほかのルールでは無視して5枚）。
  */
 export function createInitialGameState(
   random = Math.random,
@@ -27,15 +28,20 @@ export function createInitialGameState(
     roleLevels = {},
     ruleset = DEFAULT_RULESET_ID,
     items = [],
+    handSize,
   } = {},
 ) {
+  const rulesetId = normalizeRulesetId(ruleset);
+  const size = handSizeFor(rulesetId, handSize);
   const rules = normalizePointRules(pointRules);
   const shuffled = shuffleDeck(deckCards ?? createDemoDeck(), random);
-  const openingDraw = drawCards(shuffled, GAME_CONFIG.START_HAND_SIZE);
+  const openingDraw = drawCards(shuffled, size);
 
   return {
     battle,
-    ruleset: normalizeRulesetId(ruleset),
+    ruleset: rulesetId,
+    // 毎ターン引き直す手札の枚数。
+    handSize: size,
     pointRules: rules,
     // 系統ごとの強化レベル（{ 系統: レベル }）。連戦中に報酬で上がる。
     roleLevels: { ...roleLevels },
@@ -71,6 +77,6 @@ export function createInitialGameState(
     // 直前の敵ターンで各敵が行った行動。
     lastCpuActions: [],
     turnTotals: createTurnTotals(),
-    battleMessage: `${GAME_CONFIG.START_HAND_SIZE}枚のカードをドロー。あなたのターンです。`,
+    battleMessage: `${size}枚のカードをドロー。あなたのターンです。`,
   };
 }

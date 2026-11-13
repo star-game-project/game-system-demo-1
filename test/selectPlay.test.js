@@ -171,10 +171,10 @@ test("a fresh battle under this rule starts with an empty field and no role", ()
   assert.equal(state.currentRole.multiplier, 1);
 });
 
-test("there is no draw step: every turn starts with five cards, ready to play", () => {
+test("there is no draw step: every turn starts with a full hand, ready to play", () => {
   const state = createInitialGameState(() => 0.5, null, { ruleset: "select_play" });
   assert.equal(state.phase, PHASES.CARD_SELECT);
-  assert.equal(state.player.hand.length, 5);
+  assert.equal(state.player.hand.length, state.handSize);
 
   const engine = new BattleEngine(state, () => 0.5);
   assert.equal(engine.chooseDraw(true), false, "drawing is not offered");
@@ -182,9 +182,26 @@ test("there is no draw step: every turn starts with five cards, ready to play", 
   engine.startCpuTurn();
   engine.finishTurn();
   assert.equal(engine.state.phase, PHASES.CARD_SELECT);
-  assert.equal(engine.state.player.hand.length, 5);
+  assert.equal(engine.state.player.hand.length, state.handSize);
 
   // ほかのルールは今までどおりドロー選択から始まる。
   assert.equal(createInitialGameState(() => 0.5).phase, PHASES.DRAW_SELECT);
   assert.equal(createInitialGameState(() => 0.5, null, { ruleset: "dice_color" }).phase, PHASES.DRAW_SELECT);
+});
+
+test("the hand size is chosen on the build screen, six or seven, and only for this rule", () => {
+  const six = createInitialGameState(() => 0.5, null, { ruleset: "select_play" });
+  assert.equal(six.handSize, 6, "six by default");
+  assert.equal(six.player.hand.length, 6);
+
+  const seven = createInitialGameState(() => 0.5, null, { ruleset: "select_play", handSize: 7 });
+  assert.equal(seven.player.hand.length, 7);
+  const engine = new BattleEngine(seven, () => 0.5);
+  engine.endTurn();
+  engine.startCpuTurn();
+  engine.finishTurn();
+  assert.equal(engine.state.player.hand.length, 7, "every turn refills to the chosen size");
+
+  assert.equal(createInitialGameState(() => 0.5, null, { ruleset: "select_play", handSize: 9 }).handSize, 6, "only 6 or 7");
+  assert.equal(createInitialGameState(() => 0.5, null, { handSize: 7 }).player.hand.length, 5, "the current rules keep five");
 });

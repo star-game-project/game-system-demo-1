@@ -43,8 +43,10 @@ import {
 } from "./game/pointRules.js";
 import {
   DEFAULT_RULESET_ID,
+  DEFAULT_SELECT_PLAY_HAND_SIZE,
   RULESETS,
   RULESET_BY_ID,
+  SELECT_PLAY_HAND_SIZES,
   normalizeRulesetId,
 } from "./game/rulesets.js";
 import { DICE_COLOR_BY_ID } from "./data/diceColors.js";
@@ -91,6 +93,8 @@ let runColors = null;
 let runItems = [];
 // 構築画面で選ぶ持ち込みアイテム（{ アイテムid: 個数 }）。連戦の最初に持つ。
 let startItemCounts = {};
+// 「選んで出す（試作）」の手札の枚数（構築画面で 6 / 7 から選ぶ）。ほかのルールでは使わない。
+let selectHandSize = DEFAULT_SELECT_PLAY_HAND_SIZE;
 // 報酬画面の状態：{ offers, gainKey, removeKey, roleOffers, roleKey, itemOffers, itemKey, battle, playerHp }
 let reward = null;
 
@@ -115,6 +119,7 @@ function startBattle(carry = {}) {
       ruleset,
       roleLevels: runRoleLevels,
       items: runItems,
+      handSize: selectHandSize,
       ...carry,
     }),
   );
@@ -814,10 +819,20 @@ function renderRulesetPicker() {
       </button>
     `,
   ).join("");
+  // 「選んで出す（試作）」はドロー選択がない代わりに、手札の枚数を選ぶ。
+  const handSizes = ruleset === "select_play"
+    ? `
+      <div class="ruleset-picker__hand-size">
+        <span>手札の枚数（毎ターン引き直す）</span>
+        ${SELECT_PLAY_HAND_SIZES.map((size) => `<button class="command-button command-button--secondary ${size === selectHandSize ? "is-active" : ""}" data-hand-size="${size}" aria-pressed="${size === selectHandSize}">${size}枚</button>`).join("")}
+      </div>
+    `
+    : "";
   return `
     <section class="ruleset-picker">
-      <div><span class="eyebrow">RULES</span><strong>どちらのルールで遊ぶか</strong></div>
+      <div><span class="eyebrow">RULES</span><strong>どのルールで遊ぶか</strong></div>
       <div class="ruleset-picker__options">${options}</div>
+      ${handSizes}
     </section>
   `;
 }
@@ -1231,6 +1246,13 @@ function bindEvents() {
       const key = input.dataset.pointRule;
       const value = input.type === "checkbox" ? input.checked : input.value;
       pointRules = normalizePointRules({ ...pointRules, [key]: value });
+      render();
+    });
+  });
+
+  app.querySelectorAll("[data-hand-size]").forEach((button) => {
+    button.addEventListener("click", () => {
+      selectHandSize = Number(button.dataset.handSize);
       render();
     });
   });

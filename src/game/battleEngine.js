@@ -576,7 +576,7 @@ export class BattleEngine {
 
     // 手札はターン終了時にすべて捨て札へ送り、新しい手札を引き直す。
     const discarded = this.discardHand();
-    const refill = this.drawIntoHand(GAME_CONFIG.START_HAND_SIZE);
+    const refill = this.drawIntoHand(this.state.handSize ?? GAME_CONFIG.START_HAND_SIZE);
 
     this.state.selectedCardId = null;
     this.state.currentRole = this.evaluateRole();

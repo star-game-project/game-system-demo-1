@@ -58,8 +58,9 @@ export function createInitialGameState(
     // 攻撃の対象。倒れたら生き残っている先頭の敵に移る。
     targetId: "enemy_1",
     selectedCardId: null,
-    // 「選んで出す（試作）」で、出すために選んでいるカード。役はこのカードだけで判定する。
-    selectedCardIds: [],
+    // 「選んで出す（試作）」で、このターンに場に出したカード（{ card, targetId, attack }、出した順）。
+    // ターン終了時にまとめて処理する。役はこのカードだけで判定する。
+    playedCards: [],
     currentRole: normalizeRulesetId(ruleset) === "select_play"
       ? evaluateHandRole([], roleLevels, "select_play")
       : evaluateHandRole(openingDraw.drawn, roleLevels, normalizeRulesetId(ruleset)),

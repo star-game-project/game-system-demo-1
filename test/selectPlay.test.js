@@ -170,3 +170,21 @@ test("a fresh battle under this rule starts with an empty field and no role", ()
   assert.deepEqual(state.playedCards, []);
   assert.equal(state.currentRole.multiplier, 1);
 });
+
+test("there is no draw step: every turn starts with five cards, ready to play", () => {
+  const state = createInitialGameState(() => 0.5, null, { ruleset: "select_play" });
+  assert.equal(state.phase, PHASES.CARD_SELECT);
+  assert.equal(state.player.hand.length, 5);
+
+  const engine = new BattleEngine(state, () => 0.5);
+  assert.equal(engine.chooseDraw(true), false, "drawing is not offered");
+  engine.endTurn();
+  engine.startCpuTurn();
+  engine.finishTurn();
+  assert.equal(engine.state.phase, PHASES.CARD_SELECT);
+  assert.equal(engine.state.player.hand.length, 5);
+
+  // ほかのルールは今までどおりドロー選択から始まる。
+  assert.equal(createInitialGameState(() => 0.5).phase, PHASES.DRAW_SELECT);
+  assert.equal(createInitialGameState(() => 0.5, null, { ruleset: "dice_color" }).phase, PHASES.DRAW_SELECT);
+});

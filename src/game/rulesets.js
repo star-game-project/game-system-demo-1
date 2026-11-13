@@ -1,3 +1,5 @@
+import { PHASES } from "../data/constants.js";
+
 /**
  * デモで遊び比べるルール。デッキ構築画面で選び、連戦中は変えない。
  * 検討中の大きな変更を、現行ルールと切り替えて試すためにある（デモ限定）。
@@ -31,4 +33,12 @@ export const RULESET_BY_ID = Object.freeze(
 /** 知らない id は現行ルールに戻す。 */
 export function normalizeRulesetId(id) {
   return RULESET_BY_ID[id] ? id : DEFAULT_RULESET_ID;
+}
+
+/**
+ * ターンの最初の段階。「選んで出す（試作）」にはドロー選択（DRAW / SKIP）がなく、
+ * 5枚の手札でカードを使う段階から始まる。
+ */
+export function turnStartPhase(rulesetId) {
+  return rulesetId === "select_play" ? PHASES.CARD_SELECT : PHASES.DRAW_SELECT;
 }

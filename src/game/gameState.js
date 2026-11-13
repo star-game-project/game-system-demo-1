@@ -4,7 +4,7 @@ import { createEnemies } from "../data/enemies.js";
 import { drawCards, shuffleDeck } from "./deckLogic.js";
 import { evaluateHandRole } from "./roleLogic.js";
 import { DEFAULT_POINT_RULES, normalizePointRules } from "./pointRules.js";
-import { DEFAULT_RULESET_ID, normalizeRulesetId } from "./rulesets.js";
+import { DEFAULT_RULESET_ID, normalizeRulesetId, turnStartPhase } from "./rulesets.js";
 
 /** 1ターン中に使ったカードの合計。ターン開始時に作り直す。 */
 export function createTurnTotals() {
@@ -40,7 +40,7 @@ export function createInitialGameState(
     // 系統ごとの強化レベル（{ 系統: レベル }）。連戦中に報酬で上がる。
     roleLevels: { ...roleLevels },
     turn: 1,
-    phase: PHASES.DRAW_SELECT,
+    phase: turnStartPhase(normalizeRulesetId(ruleset)),
     player: {
       hp: playerHp,
       maxHp: GAME_CONFIG.PLAYER_MAX_HP,

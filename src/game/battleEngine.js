@@ -5,6 +5,7 @@ import { calculateAttack } from "./damageLogic.js";
 import { advanceCpuAction, aliveEnemies, cpuActionDamage, getCpuIntent } from "./enemyLogic.js";
 import { createTurnTotals } from "./gameState.js";
 import { recoverPoints } from "./pointRules.js";
+import { turnStartPhase } from "./rulesets.js";
 import { ITEM_BY_ID } from "../data/items.js";
 import { canUseItem, healPlayer } from "./itemLogic.js";
 import {
@@ -579,7 +580,7 @@ export class BattleEngine {
 
     this.state.selectedCardId = null;
     this.state.currentRole = this.evaluateRole();
-    this.state.phase = PHASES.DRAW_SELECT;
+    this.state.phase = turnStartPhase(this.state.ruleset);
     const recycleNote = refill.recycleCount
       ? "捨て札をシャッフルして山札を再構築。"
       : "";

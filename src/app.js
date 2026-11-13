@@ -618,7 +618,7 @@ function renderCommands(state) {
         : "ポイントが続く限り何枚でも使えます。終わったら END TURN";
     return `
       <div class="command-copy">
-        <span class="command-step">02 / 02</span>
+        <span class="command-step">${engine.isSelectPlay() ? "01 / 01" : "02 / 02"}</span>
         <div><strong>${headline}</strong><small>${detail}</small></div>
       </div>
       <div class="command-actions">

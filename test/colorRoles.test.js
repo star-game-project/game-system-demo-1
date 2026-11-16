@@ -15,7 +15,7 @@ test("colour roles exist only under the prototype rules", () => {
   assert.equal(rolesFor("standard"), HAND_ROLES);
   assert.deepEqual(
     rolesFor(PROTO).filter((role) => role.family === "color").map((role) => role.id),
-    ["flush", "four_flush", "three_flush"],
+    ["flush", "four_flush", "three_flush", "two_flush"],
   );
   assert.ok(COLOR_ROLES.every((role) => role.ruleset === PROTO));
 });
@@ -90,4 +90,15 @@ test("without coloured cards the prototype scores exactly like the current rules
   const standard = createInitialGameState(() => 0.5);
   const prototype = createInitialGameState(() => 0.5, null, { ruleset: PROTO });
   assert.deepEqual(prototype.currentRole, standard.currentRole);
+});
+
+test("two cards of the same colour make FLUSH (2枚) at x1.1", () => {
+  // 目の役が立たない 1,4,6 に、赤が2枚。
+  const cards = hand([1, "red"], [4, "red"], [6, "blue"]);
+  const result = evaluateHandRole(cards, {}, PROTO);
+  assert.deepEqual(ids(result), ["two_flush"]);
+  assert.equal(result.multiplier, 1.1);
+  // 色がすべて違えば色の役は立たない。
+  const mixed = hand([1, "red"], [4, "blue"], [6, "green"]);
+  assert.equal(ids(evaluateHandRole(mixed, {}, PROTO)).includes("two_flush"), false);
 });

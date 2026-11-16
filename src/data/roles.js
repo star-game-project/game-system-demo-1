@@ -159,7 +159,8 @@ export const HAND_ROLES = Object.freeze([
  *   FLUSH（3枚）（同色がちょうど3枚）35.2% → SET（2枚）並み
  *   FLUSH（4枚）（ちょうど4枚）5.9%       → SET（3枚）並み
  *   FLUSH（全部）（5枚すべて）0.4%        → SET（3枚＋2枚）と SET（4枚）の間
- * その後、FLUSH（3枚）は ×1.1 → ×1.25 に引き上げた（調整の依頼による）。
+ * その後、調整の依頼により FLUSH（3枚）を ×1.1 → ×1.25 に引き上げ、FLUSH（2枚）×1.1 を加えた。
+ * 4色・手札5枚では同じ色が必ず2枚以上になる（鳩の巣原理）ため、FLUSH（2枚）以上が常に成立する。
  */
 export const COLOR_ROLES = Object.freeze([
   {
@@ -196,6 +197,17 @@ export const COLOR_ROLES = Object.freeze([
     priority: 35,
     ruleset: "dice_color",
     description: "同じ色が3枚",
+  },
+  {
+    id: "two_flush",
+    name: "FLUSH",
+    stage: "2枚",
+    family: "color",
+    multiplier: 1.1,
+    kind: "bonus",
+    priority: 30,
+    ruleset: "dice_color",
+    description: "同じ色が2枚",
   },
 ]);
 

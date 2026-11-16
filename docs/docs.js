@@ -296,8 +296,8 @@ table(
 );
 
 // ---- 7.6 色の役 ----
-// 色が一様に付いた手札5枚での実測値（10万回）。コード上には無い値なので表示用に保持する。
-const COLOR_ROLE_FREQUENCY = { flush: "0.41%", four_flush: "5.87%", three_flush: "35.45%" };
+// 色が一様に付いた手札5枚での実測値（10万回。two_flush だけは後から追加したため計算値）。コード上には無い値なので表示用に保持する。
+const COLOR_ROLE_FREQUENCY = { flush: "0.41%", four_flush: "5.87%", three_flush: "35.45%", two_flush: "58.59%" };
 table(
   document.querySelector("#color-roles-table"),
   ["役", "条件", "倍率", "単独成立率"],

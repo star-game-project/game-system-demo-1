@@ -97,6 +97,8 @@ function matchesRole(roleId, context) {
       return colorMax >= 4;
     case "three_flush":
       return colorMax >= 3;
+    case "two_flush":
+      return colorMax >= 2;
     case "one_two_three":
       // 4 まで伸ばせば STRAIGHT として脱出できる。
       return (

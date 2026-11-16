@@ -32,7 +32,7 @@ test("the role list groups the current rules into four families, weakest stage f
 test("the colour family joins the list only under the prototype rules", () => {
   assert.equal(roleFamiliesFor("standard").some((entry) => entry.family === "color"), false);
   const color = roleFamiliesFor("dice_color").find((entry) => entry.family === "color");
-  assert.deepEqual(color.roles.map((role) => role.stage), ["3枚", "4枚", "全部"]);
+  assert.deepEqual(color.roles.map((role) => role.stage), ["2枚", "3枚", "4枚", "全部"]);
 });
 
 test("a scored hand names each family once, with the stage it reached", () => {

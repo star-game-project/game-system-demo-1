@@ -75,7 +75,7 @@ test("roles from different families multiply together", () => {
   assert.equal(mult(6, 6, 6, 6, 2), product(2.25, 1.3));
 
   assert.deepEqual(ids(2, 3, 4, 4, 5), ["pair", "four_straight"]);
-  assert.equal(mult(2, 3, 4, 4, 5), product(1.1, 1.35));
+  assert.equal(mult(2, 3, 4, 4, 5), product(1.15, 1.35));
 });
 
 test("nested roles within one family are never counted twice", () => {
@@ -117,8 +117,8 @@ test("a wild die is never used to complete the 1-2-3 penalty", () => {
 
 test("an upgraded family adds the growth step per level to its multiplier", () => {
   const levels = { set: 2 };
-  assert.equal(evaluateHandRole(hand(2, 2, 5), levels).multiplier, 1.1 + 2 * ROLE_GROWTH.UPGRADE_STEP);
-  assert.equal(evaluateHandRole(hand(2, 2, 5)).multiplier, 1.1, "no levels means the base multiplier");
+  assert.equal(evaluateHandRole(hand(2, 2, 5), levels).multiplier, Number((1.15 + 2 * ROLE_GROWTH.UPGRADE_STEP).toFixed(3)));
+  assert.equal(evaluateHandRole(hand(2, 2, 5)).multiplier, 1.15, "no levels means the base multiplier");
 });
 
 test("upgrading a family raises every stage alike, so the stage reached stays the same", () => {
@@ -136,9 +136,9 @@ test("the penalty role cannot be upgraded", () => {
 
 test("a wild die follows upgraded multipliers when picking its value", () => {
   // 2,3,4 + ワイルド：通常は 1 か 5 にして FOUR STRAIGHT ×1.35。
-  // SET を5上げて SET（2枚）が ×1.6 になると、2〜4 のどれかにして SET（2枚）× STRAIGHT（3連）の方が高くなる。
+  // SET を5上げて SET（2枚）が ×1.65 になると、2〜4 のどれかにして SET（2枚）× STRAIGHT（3連）の方が高くなる。
   assert.equal(evaluateHandRole(withWild(2, 3, 4)).roleId, "four_straight");
   const upgraded = evaluateHandRole(withWild(2, 3, 4), { set: 5 });
   assert.deepEqual(upgraded.roles.map((role) => role.id).sort(), ["pair", "three_straight"]);
-  assert.equal(upgraded.multiplier, product(1.6, 1.15));
+  assert.equal(upgraded.multiplier, product(1.65, 1.15));
 });

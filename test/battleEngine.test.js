@@ -669,9 +669,9 @@ test("role levels carried into a battle raise the attack preview", () => {
   const upgraded = engineWithHand([card("a", 4, { attack: 10 }), card("b", 4), card("c", 1)]);
   upgraded.state.roleLevels = { set: 4 };
 
-  // 4,4,1 は SET（2枚）。×1.1 と ×1.5（+0.1 × 4）。
-  assert.equal(plain.getAttackPreview("a").finalAttack, Math.round(10 * 1.1));
-  assert.equal(upgraded.getAttackPreview("a").finalAttack, Math.round(10 * 1.5));
+  // 4,4,1 は SET（2枚）。×1.15 と ×1.55（+0.1 × 4）。
+  assert.equal(plain.getAttackPreview("a").finalAttack, Math.round(10 * 1.15));
+  assert.equal(upgraded.getAttackPreview("a").finalAttack, Math.round(10 * 1.55));
 });
 
 test("a new battle starts with the carried role levels", () => {
@@ -786,7 +786,7 @@ function twoEnemyEngine(hand) {
 }
 
 test("an area attack hits every living enemy with the same role-multiplied damage", () => {
-  // 3,3,2 は PAIR（×1.1）だけが成立する。9 × 1.1 = 10 を両方の敵に。
+  // 3,3,2 は SET（2枚）（×1.15）だけが成立する。9 × 1.15 = 10 を両方の敵に。
   const engine = twoEnemyEngine([sweepCard(), card("b", 3), card("c", 2)]);
   const [first, second] = engine.state.enemies;
 

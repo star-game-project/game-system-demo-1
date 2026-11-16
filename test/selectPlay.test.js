@@ -59,9 +59,9 @@ test("the first card played also gets the multiplier of the role decided at the 
   assert.equal(engine.state.currentRole.roleId, "pair");
 
   engine.endTurn();
-  // 4,4 は SET（2枚）×1.1。1枚目も 10 × 1.1 = 11、2枚目は 15 × 1.1 = 17（四捨五入）。
-  assert.equal(engine.state.enemies[0].hp, 50 - 11 - 17);
-  assert.equal(engine.state.lastAttack.roleMultiplier, 1.1);
+  // 4,4 は SET（2枚）×1.15。1枚目も 10 × 1.15 = 12（四捨五入）、2枚目は 15 × 1.15 = 17（四捨五入）。
+  assert.equal(engine.state.enemies[0].hp, 50 - 12 - 17);
+  assert.equal(engine.state.lastAttack.roleMultiplier, 1.15);
   assert.equal(engine.state.phase, PHASES.PLAYER_ATTACK);
   assert.deepEqual(engine.getPlayedCards(), [], "the field is cleared");
   assert.equal(engine.state.player.discardPile.length, 2);
@@ -72,8 +72,8 @@ test("each card keeps the target chosen when it was played", () => {
   play(engine, "a", "enemy_1");
   play(engine, "b", "enemy_2");
   engine.endTurn();
-  assert.equal(engine.state.enemies[0].hp, 50 - 11);
-  assert.equal(engine.state.enemies[1].hp, 50 - 11);
+  assert.equal(engine.state.enemies[0].hp, 50 - 12);
+  assert.equal(engine.state.enemies[1].hp, 50 - 12);
 });
 
 test("an attack whose target already fell goes to the first enemy still standing", () => {
@@ -94,8 +94,8 @@ test("defense cards count toward the role and add shield, without the multiplier
   play(engine, "def");
   play(engine, "atk");
   engine.endTurn();
-  // 防御カードの目も役に入る（4,4 で SET（2枚））。攻撃は 10 × 1.1、シールドは 10 のまま。
-  assert.equal(engine.state.enemies[0].hp, 50 - 11);
+  // 防御カードの目も役に入る（4,4 で SET（2枚））。攻撃は 10 × 1.15 = 12、シールドは 10 のまま。
+  assert.equal(engine.state.enemies[0].hp, 50 - 12);
   assert.equal(engine.state.player.shield, 10);
 });
 
@@ -104,8 +104,8 @@ test("an area attack on the field hits every enemy, with the field's multiplier"
   play(engine, "a");
   play(engine, "sweep");
   engine.endTurn();
-  // 3,3 は ×1.1。対象には 11 + 10、もう1体には 10。
-  assert.equal(engine.state.enemies[0].hp, 50 - 11 - 10);
+  // 3,3 は ×1.15。対象には 12 + 10（9 × 1.15 = 10）、もう1体には 10。
+  assert.equal(engine.state.enemies[0].hp, 50 - 12 - 10);
   assert.equal(engine.state.enemies[1].hp, 50 - 10);
 });
 
@@ -115,8 +115,8 @@ test("the preview of a selected card uses the tentative role of the field plus t
   engine.selectCard("b");
   const preview = engine.getAttackPreview("b");
   assert.equal(preview.tentative, true);
-  assert.equal(preview.roleMultiplier, 1.1);
-  assert.equal(preview.finalAttack, 22);
+  assert.equal(preview.roleMultiplier, 1.15);
+  assert.equal(preview.finalAttack, 23);
   // 見込みを出しても、敵や場は変わらない。
   assert.equal(engine.state.enemies[0].hp, 50);
   assert.equal(engine.getFieldPreview().finalAttack, 10, "the field alone is a lone 4, no role yet");

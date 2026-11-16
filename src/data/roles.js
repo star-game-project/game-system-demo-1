@@ -9,7 +9,7 @@ import { hasRule } from "../game/rulesets.js";
  *
  * 表示では、同じ family の役を1つの名前（name ＝ 系統名）にまとめ、
  * 強い役が成立するほど同じ名前のまま倍率が上がる「段階」（stage）として見せる。
- * 例）SET（2枚）×1.1 → SET（2組）×1.25 → … → SET（全部同じ）×2.5
+ * 例）SET（2枚）×1.15 → SET（2組）×1.25 → … → SET（全部同じ）×2.5
  *
  * 採用された役は family をまたいで掛け合わせる。
  * 例）3,3,3,1,1 → SET（3枚＋2枚）× PARITY（奇数のみ）
@@ -134,7 +134,7 @@ export const HAND_ROLES = Object.freeze([
     name: "SET",
     stage: "2枚",
     family: "set",
-    multiplier: 1.1,
+    multiplier: 1.15,
     kind: "bonus",
     priority: 40,
     description: "同じ目が2枚",

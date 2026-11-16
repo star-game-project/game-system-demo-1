@@ -57,9 +57,9 @@ test("colour on the field counts: three red cards make FLUSH (3枚) on top of th
     card("d", 6, "blue"),
   ]);
   ["a", "b", "c"].forEach((id) => play(engine, id));
-  // 場は 4,4,1 がすべて赤：SET（2枚）×1.15 × FLUSH（3枚）×1.1。手札に残った青は数えない。
+  // 場は 4,4,1 がすべて赤：SET（2枚）×1.15 × FLUSH（3枚）×1.25。手札に残った青は数えない。
   assert.deepEqual(engine.state.currentRole.roles.map((role) => role.id).sort(), ["pair", "three_flush"]);
   engine.endTurn();
-  const each = Math.round(10 * 1.15 * 1.1);
+  const each = Math.round(10 * 1.15 * 1.25);
   assert.equal(engine.state.enemies[0].hp, 50 - each * 3);
 });

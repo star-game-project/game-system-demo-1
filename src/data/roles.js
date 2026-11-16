@@ -155,10 +155,11 @@ export const HAND_ROLES = Object.freeze([
 /**
  * 色の役。ルール「ダイスの色（試作）」でだけ判定する（rolesFor）。
  * 同じ色の枚数で段階を付け、目の役とは系統（color）をまたいで掛け合わせる。
- * 倍率は、色が一様に付いた手札5枚での成立しやすさを目の役の並びに当てはめた仮の値：
+ * 倍率は仮の値。最初は色が一様に付いた手札5枚での成立しやすさを目の役の並びに当てはめた：
  *   FLUSH（3枚）（同色がちょうど3枚）35.2% → SET（2枚）並み
  *   FLUSH（4枚）（ちょうど4枚）5.9%       → SET（3枚）並み
  *   FLUSH（全部）（5枚すべて）0.4%        → SET（3枚＋2枚）と SET（4枚）の間
+ * その後、FLUSH（3枚）は ×1.1 → ×1.25 に引き上げた（調整の依頼による）。
  */
 export const COLOR_ROLES = Object.freeze([
   {
@@ -190,7 +191,7 @@ export const COLOR_ROLES = Object.freeze([
     name: "FLUSH",
     stage: "3枚",
     family: "color",
-    multiplier: 1.1,
+    multiplier: 1.25,
     kind: "bonus",
     priority: 35,
     ruleset: "dice_color",

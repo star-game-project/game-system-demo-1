@@ -337,8 +337,8 @@ table(
   ["系統", "段階と倍率（強化なし）"],
   roleFamiliesFor("dice_color+select_play+graded_roles").map(({ name, roles }) => [
     `<b>${name}</b>`,
-    // 各系統の1つ目はそのまま、2つ目以降は小数第2位に丸めて見やすくする（実際の計算は丸めない）。
-    roles.map((role, index) => `${role.stage} ×${index === 0 ? role.multiplier : Number(role.multiplier.toFixed(2))}`).join("、"),
+    // 各系統の1つ目だけを載せ、2つ目以降は省略する（段階は式で増えるので、全段階は上の式から求める）。
+    `${roles[0].stage} ×${roles[0].multiplier}${roles.length > 1 ? ` …（全${roles.length}段階。以降は上の式で倍率が上がる）` : ""}`,
   ]),
 );
 

@@ -77,7 +77,8 @@ function table(element, headers, rows) {
 }
 
 function multiplierLabel(value) {
-  return Number.isInteger(value) ? `×${value}` : `×${value.toFixed(1)}`;
+  // 小数第1位で丸めると ×1.15 が ×1.1 に見えるため、小数第3位までそのまま出す。
+  return `×${Number(value.toFixed(3))}`;
 }
 
 function dieLabel(definition) {

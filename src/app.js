@@ -762,7 +762,10 @@ function roleMultiplierText(role, levels = {}) {
 function renderRoleTable(levels = {}, rulesetId = ruleset) {
   return roleFamiliesFor(rulesetId).map(({ family, name, label, roles }) => {
     const risk = family === "penalty";
-    const stages = roles.map(
+    // 「役の新計算（試作）」は段階が多い（1系統に最大10行）ので、各系統の1つ目だけを出し、残りは件数で示す。
+    const shown = hasRule(rulesetId, "graded_roles") ? roles.slice(0, 1) : roles;
+    const hidden = roles.length - shown.length;
+    const stages = shown.map(
       (role) => `
         <div class="role-table__row ${risk ? "role-table__row--risk" : ""}">
           <span>${role.stage ?? role.name}</span>
@@ -770,7 +773,7 @@ function renderRoleTable(levels = {}, rulesetId = ruleset) {
           <b>${roleMultiplierText(role, levels)}</b>
         </div>
       `,
-    ).join("");
+    ).join("") + (hidden ? `<small class="role-table__more">…ほか${hidden}段階（枚数が増えるほど倍率が上がる）</small>` : "");
     return `
       <div class="role-family ${risk ? "role-family--risk" : ""}">
         <div class="role-family__head"><strong>${name}</strong><small>${label}${levels[family] ? ` · Lv${levels[family]}（${upgradeNote(family, levels[family], rulesetId)}）` : ""}${COMBO_FORMULAS[family] ? ` · 強化できない（${ROLE_FAMILY_INFO[COMBO_FORMULAS[family].of].name} の強化が反映される）` : ""}</small></div>

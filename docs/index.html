@@ -115,7 +115,7 @@
       <div class="docs-table-wrap"><table id="default-deck-table"></table></div>
 
       <h3>3.5 ルールの選択</h3>
-      <p>構築画面の <b>RULES</b> で、どのルールで遊ぶかを選ぶ。<b>試作ルール</b>（ダイスの色・選んで出す）は<b>それぞれ ON / OFF でき、組み合わせて遊べる</b>。どれも OFF なら現行ルール、「現行ルール」を押すとすべて OFF になる。選んだルールは連戦中に引き継ぎ、戦闘画面の上部に表示する（例：「ダイスの色（試作）＋選んで出す（試作）」）。途中で変えるには構築画面に戻る（次は1戦目から）。</p>
+      <p>構築画面の <b>RULES</b> で、どのルールで遊ぶかを選ぶ。<b>試作ルール</b>（ダイスの色・選んで出す・目と色を振る・役の新計算）は<b>それぞれ ON / OFF でき、組み合わせて遊べる</b>。どれも OFF なら現行ルール、「現行ルール」を押すとすべて OFF になる。選んだルールは連戦中に引き継ぎ、戦闘画面の上部に表示する（例：「ダイスの色（試作）＋選んで出す（試作）」）。途中で変えるには構築画面に戻る（次は1戦目から）。</p>
       <div class="docs-table-wrap"><table id="ruleset-table"></table></div>
       <aside class="docs-callout docs-callout--demo" data-summary="ルールの選択は、検討中の大きな変更を現行ルールと遊び比べるためのもの">
         <span class="docs-tag docs-tag--demo">デモ限定</span>
@@ -391,6 +391,25 @@ hp      -= taken</code></pre>
         <span class="docs-tag docs-tag--open">検討中</span>
         <p>出すカードを選べるため、役の成立率も期待倍率も現行ルールより上がる。倍率・ポイント（コスト）・敵のHPと攻撃力の釣り合いは、遊んでから調整する。使わなかったカードはターン終了時に捨てる（6.5 のまま）が、持ち越すかどうかも検討する。</p>
       </aside>
+
+      <h3>7.8 役の新計算（「役の新計算（試作）」のときだけ）</h3>
+      <p>役の系統と倍率の計算を置き換える。どの系統も<b>役を構成する枚数が増えるほど、式に従って倍率が上がる</b>。系統ごとに成立している最も高い倍率を1つ採り、系統をまたいで掛け合わせるのは今までと同じ。ほかの試作ルールと組み合わせられる（判定する手札・場、色の役の有無はほかのルールに従う）。</p>
+      <div class="docs-table-wrap"><table id="graded-formula-table"></table></div>
+      <ul>
+        <li><b>SET-COMBO</b>：<b>ちょうど同じ枚数</b>の SET がいくつあるかで判定する（3,3,1,1 は 2枚×2）。大きさの違う組（3枚＋2枚）は SET-COMBO にならない。FLUSH-COMBO も色について同じ。</li>
+        <li><b>STRAIGHT-COMBO</b>：<b>まったく同じ目の階段</b>が2つ以上あるときだけ成立する（1,1,2,2,3,3 は 3連×2。1-2-3 と 2-3-4 では成立しない）。このとき同じ枚数の SET も2つ以上あるが、<b>SET-COMBO としては数えない</b>。</li>
+        <li><b>PARITY</b>：今までどおり、手札（「選んで出す」では場）が<b>すべて偶数／すべて奇数</b>のときだけ成立し、その枚数（3枚以上）で倍率が決まる。</li>
+        <li>FLUSH・FLUSH-COMBO は「ダイスの色（試作）」も ON のときだけ判定する。</li>
+        <li><b>減算役 1-2-3 はない</b>。SET（全部同じ）と PARITY の重複除外（7.2）もない。</li>
+        <li>3枚の組を2つ、3連を2つ作るには6枚以上要るので、SET-COMBO（3枚×2）・STRAIGHT-COMBO は実際には「選んで出す」（手札6〜7枚）か、ドローした6枚の手札でしか成立しない。段階は手札の最大枚数（「選んで出す」は7枚、ほかはドロー後の6枚）まで作る。</li>
+        <li><b>強化</b>は式の<b>底（基礎倍率）</b>に +0.1/レベルを足す（SET Lv1 なら 1.15 → 1.25 で、1.25^(n-1)×1.05^(n-2)）。枚数が多い段階ほど強化の効果が大きい。<b>COMBO 系統は強化できず</b>、報酬の候補にも出ない。ただし COMBO の倍率は、構成する役（SET など）の<b>強化後の倍率</b>から計算する。</li>
+      </ul>
+      <div class="docs-table-wrap"><table id="graded-roles-table"></table></div>
+      <p class="docs-note">上の表は「ダイスの色」と「選んで出す」も ON（手札7枚まで）のときの全段階と、強化なしの倍率。倍率は小数第3位で丸める。</p>
+      <aside class="docs-callout docs-callout--open" data-summary="役の新計算：枚数に応じて倍率が上がる系統と COMBO 系統を採用するか">
+        <span class="docs-tag docs-tag--open">検討中</span>
+        <p>従来の役と遊び比べるための試作ルール。採用するか、式の係数（COMBO の 0.9・0.95 など）、PARITY の成立条件（「選んで出す」では3枚選ぶだけで成立する）、減算役をなくしてよいかは、遊んでから決める。</p>
+      </aside>
     </section>
 
     <section id="abilities">
@@ -608,7 +627,7 @@ target.hp    -= dealt</code></pre>
       <h2>12. 状態</h2>
       <pre><code>type GameState = {
   battle: number;               // 連戦の何戦目か（1始まり）
-  ruleset: string; // 構築画面で選んだルール（3.5）。"standard" か、ON にした試作ルールを "+" でつないだもの（"dice_color" / "select_play" / "roll_dice" / "dice_color+roll_dice" など）
+  ruleset: string; // 構築画面で選んだルール（3.5）。"standard" か、ON にした試作ルールを "+" でつないだもの（"dice_color" / "select_play" / "roll_dice" / "graded_roles" / "dice_color+roll_dice" など）
   playedCards: { card, targetId, attack }[]; // 「選んで出す（試作）」で場に出したカード（出した順。ターン終了時に処理。7.7）
   pointRules: { startPoint: number; maxPoint: number; recovery: number; fullRefill: boolean };
   roleLevels: { [family: string]: number }; // 系統ごとの強化レベル（例：{ set: 2 }。連戦中に引き継ぐ）

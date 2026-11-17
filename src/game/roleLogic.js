@@ -1,4 +1,5 @@
 import { rolesFor, upgradedMultiplier } from "../data/roles.js";
+import { matchesGradedRole } from "../data/gradedRoles.js";
 import { isWildCard, MAX_DIE_VALUE, MIN_DIE_VALUE } from "./abilityLogic.js";
 
 const NO_ROLE = Object.freeze({
@@ -109,7 +110,7 @@ function matchesRole(roleId, context) {
   }
 }
 
-function evaluateConcreteHand(values, handSize, families, colorMax = 0) {
+function evaluateConcreteHand(values, handSize, families, colorCounts = new Map()) {
   const counts = tally(values);
   const distinct = [...counts.keys()].sort((a, b) => a - b);
   const context = {
@@ -118,13 +119,17 @@ function evaluateConcreteHand(values, handSize, families, colorMax = 0) {
     run: longestRun(distinct),
     values,
     handSize,
-    colorMax,
+    colorCounts,
+    colorMax: Math.max(0, ...colorCounts.values()),
   };
 
   // family ごとに最も倍率の高い役をひとつ選び、family をまたいで掛け合わせる。
+  // 「役の新計算（試作）」の役（graded）は gradedRoles.js の判定を使う。
   const perFamily = families.map((candidates) =>
     candidates.find(
-      (role) => meetsHandSize(role, handSize) && matchesRole(role.id, context),
+      (role) =>
+        meetsHandSize(role, handSize) &&
+        (role.graded ? matchesGradedRole(role, context) : matchesRole(role.id, context)),
     ),
   ).filter(Boolean);
 
@@ -170,10 +175,10 @@ function wildAssignments(count, start = 0) {
   return results;
 }
 
-/** 同じ色のカードの最大枚数。色の無いカード（現行ルール）は数えない。 */
-function largestColorGroup(hand) {
+/** 色ごとのカードの枚数。色の無いカード（現行ルール）は数えない。 */
+function colorTally(hand) {
   const colors = hand.map((card) => card.color).filter(Boolean);
-  return Math.max(0, ...tally(colors).values());
+  return tally(colors);
 }
 
 /**
@@ -183,7 +188,7 @@ function largestColorGroup(hand) {
 export function evaluateHandRole(hand, levels = {}, ruleset = "standard") {
   if (!hand.length) return noRole();
   const families = familiesFor(levels, ruleset);
-  const colorMax = largestColorGroup(hand);
+  const colorCounts = colorTally(hand);
 
   const fixedValues = hand
     .filter((card) => !isWildCard(card))
@@ -191,7 +196,7 @@ export function evaluateHandRole(hand, levels = {}, ruleset = "standard") {
   const wildCount = hand.length - fixedValues.length;
 
   if (wildCount === 0 || wildCount > MAX_WILD_SEARCH) {
-    return evaluateConcreteHand(fixedValues, hand.length, families, colorMax);
+    return evaluateConcreteHand(fixedValues, hand.length, families, colorCounts);
   }
 
   // ワイルドはプレイヤーにとって最も有利になる目として扱う。
@@ -202,7 +207,7 @@ export function evaluateHandRole(hand, levels = {}, ruleset = "standard") {
       [...fixedValues, ...assignment],
       hand.length,
       families,
-      colorMax,
+      colorCounts,
     );
     if (
       !best ||

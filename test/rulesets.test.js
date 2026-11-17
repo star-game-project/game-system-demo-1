@@ -14,10 +14,10 @@ import {
 test("the current rules and every prototype are selectable", () => {
   assert.deepEqual(
     RULESETS.map((ruleset) => ruleset.id),
-    ["standard", "dice_color", "select_play", "roll_dice"],
+    ["standard", "dice_color", "select_play", "roll_dice", "graded_roles"],
   );
   assert.equal(DEFAULT_RULESET_ID, "standard");
-  assert.deepEqual(RULE_OPTIONS.map((option) => option.id), ["dice_color", "select_play", "roll_dice"]);
+  assert.deepEqual(RULE_OPTIONS.map((option) => option.id), ["dice_color", "select_play", "roll_dice", "graded_roles"]);
 });
 
 test("a battle starts on the current rules unless another is chosen", () => {

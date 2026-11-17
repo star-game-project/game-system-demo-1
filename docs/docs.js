@@ -14,6 +14,7 @@ import {
   DEFAULT_DECK_COUNTS,
 } from "../src/data/cards.js";
 import { COLOR_ROLES, ROLE_FAMILY_INFO, roleFamiliesFor } from "../src/data/roles.js";
+import { COMBO_FORMULAS, GRADED_FORMULAS } from "../src/data/gradedRoles.js";
 import { summarizeDeck, bucketLimit } from "../src/game/deckBuilder.js";
 import { DEFAULT_RULESET_ID, RULESETS } from "../src/game/rulesets.js";
 import { ITEMS, ITEM_RULES } from "../src/data/items.js";
@@ -306,6 +307,36 @@ table(
     role.description,
     `<b class="is-bonus">${multiplierLabel(role.multiplier)}</b>`,
     COLOR_ROLE_FREQUENCY[role.id] ?? "—",
+  ]),
+);
+
+// ---- 7.8 役の新計算 ----
+// 式の表は GRADED_FORMULAS・COMBO_FORMULAS の係数を表示用に並べたもの（式の形は gradedRoles.js のコメントと同じ）。
+const GRADED_FORMULA_ROWS = [
+  ["set", "同じ目が n 枚（2枚以上）", `${GRADED_FORMULAS.set.base}^(n-1) × 1.05^(n-2)`, "できる"],
+  ["set_combo", "ちょうど s 枚の SET が k 個（2個以上）", `(SET（s枚）の倍率 × ${COMBO_FORMULAS.set_combo.factor})^(k-1)`, "できない"],
+  ["straight", "n 個連続する目（3連以上）", `${GRADED_FORMULAS.straight.base}^(n-2) × 1.1^(n-3)`, "できる"],
+  ["straight_combo", "まったく同じ s 連が k 個（2個以上）", `(STRAIGHT（s連）の倍率 × ${COMBO_FORMULAS.straight_combo.factor})^(k-1)`, "できない"],
+  ["parity", "n 枚すべてが偶数／奇数（3枚以上）", `${GRADED_FORMULAS.parity.base}^(n-2) × 0.9^(n-3)`, "できる"],
+  ["color", "同じ色が n 枚（2枚以上）", `${GRADED_FORMULAS.color.base}^(n-1) × 1.03^(n-2)`, "できる"],
+  ["color_combo", "ちょうど s 枚の FLUSH が k 個（2個以上）", `(FLUSH（s枚）の倍率 × ${COMBO_FORMULAS.color_combo.factor})^(k-1)`, "できない"],
+];
+table(
+  document.querySelector("#graded-formula-table"),
+  ["系統", "成立条件", "倍率の式", "強化"],
+  GRADED_FORMULA_ROWS.map(([family, condition, formula, upgrade]) => [
+    `<b>${ROLE_FAMILY_INFO[family].name}</b>`,
+    condition,
+    `<code>${formula}</code>`,
+    upgrade,
+  ]),
+);
+table(
+  document.querySelector("#graded-roles-table"),
+  ["系統", "段階と倍率（強化なし）"],
+  roleFamiliesFor("dice_color+select_play+graded_roles").map(({ name, roles }) => [
+    `<b>${name}</b>`,
+    roles.map((role) => `${role.stage} ×${role.multiplier}`).join("、"),
   ]),
 );
 

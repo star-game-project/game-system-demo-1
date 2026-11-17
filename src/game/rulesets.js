@@ -34,6 +34,12 @@ export const RULE_OPTIONS = Object.freeze([
     description:
       "カードの目（「ダイスの色」も ON なら色も）はカードに固定されず、手札に来るたびにランダムに振る。",
   }),
+  Object.freeze({
+    id: "graded_roles",
+    label: "役の新計算（試作）",
+    description:
+      "役を構成する枚数が増えるほど、式に従って倍率が上がる。系統に SET-COMBO・STRAIGHT-COMBO・FLUSH-COMBO（同じ大きさの役がいくつできたか）が加わり、減算役 1-2-3 はなくなる。強化は式の底（基礎倍率）を上げ、COMBO 系統は強化できない。",
+  }),
 ]);
 
 /** 現行ルールと、組み合わせの元になる試作ルール（仕様書の一覧用）。 */
@@ -58,7 +64,7 @@ export function normalizeRulesetId(id) {
   return rulesetIdFrom(ruleOptionsOf(id));
 }
 
-/** そのルールに試作ルール optionId（"dice_color" / "select_play" / "roll_dice"）が入っているか。 */
+/** そのルールに試作ルール optionId（"dice_color" / "select_play" / "roll_dice" / "graded_roles"）が入っているか。 */
 export function hasRule(rulesetId, optionId) {
   return ruleOptionsOf(rulesetId).includes(optionId);
 }

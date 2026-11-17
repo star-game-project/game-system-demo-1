@@ -1,4 +1,5 @@
 import { hasRule } from "../game/rulesets.js";
+import { buildGradedRoles, gradedRoleMultiplier } from "./gradedRoles.js";
 
 /**
  * 役はゲーム全体のルールとして管理する。
@@ -243,13 +244,23 @@ const COLOR_HAND_ROLES = Object.freeze([...HAND_ROLES, ...COLOR_ROLES]);
 const SELECT_PLAY_ROLES = forSelectPlay(HAND_ROLES);
 const SELECT_PLAY_COLOR_ROLES = forSelectPlay(COLOR_HAND_ROLES);
 
+const GRADED_ROLE_CACHE = new Map();
+function gradedRolesFor(maxCards, withColor) {
+  const key = `${maxCards}:${withColor}`;
+  if (!GRADED_ROLE_CACHE.has(key)) GRADED_ROLE_CACHE.set(key, buildGradedRoles(maxCards, withColor));
+  return GRADED_ROLE_CACHE.get(key);
+}
+
 /**
  * そのルールで判定する役。試作ルールは組み合わせられる（rulesets.js）。
  * - 「ダイスの色（試作）」が入っていれば、色の役を加える。
  * - 「選んで出す（試作）」が入っていれば、出したカードで判定する用に条件を変える（forSelectPlay）。
+ * - 「役の新計算（試作）」が入っていれば、枚数に応じて倍率が上がる役（gradedRoles.js）に置き換える。
+ *   段階は手札の最大枚数まで作る（「選んで出す」は7枚、ほかはドロー後の6枚）。
  */
 export function rolesFor(ruleset = "standard") {
   const color = hasRule(ruleset, "dice_color");
+  if (hasRule(ruleset, "graded_roles")) return gradedRolesFor(hasRule(ruleset, "select_play") ? 7 : 6, color);
   if (hasRule(ruleset, "select_play")) return color ? SELECT_PLAY_COLOR_ROLES : SELECT_PLAY_ROLES;
   return color ? COLOR_HAND_ROLES : HAND_ROLES;
 }
@@ -268,9 +279,13 @@ export const PENALTY_ROLES = Object.freeze(
 /** 系統の表示名（役の name と同じ）と、日本語の呼び方。並びは役一覧に出す順。キーは強化レベルのキーにもなる。 */
 export const ROLE_FAMILY_INFO = Object.freeze({
   set: Object.freeze({ name: "SET", label: "同じ目" }),
+  // COMBO 系統は「役の新計算（試作）」だけにある。
+  set_combo: Object.freeze({ name: "SET-COMBO", label: "同じ枚数の SET の数" }),
   straight: Object.freeze({ name: "STRAIGHT", label: "連番" }),
+  straight_combo: Object.freeze({ name: "STRAIGHT-COMBO", label: "同じ階段の数" }),
   parity: Object.freeze({ name: "PARITY", label: "偶奇" }),
   color: Object.freeze({ name: "FLUSH", label: "同じ色" }),
+  color_combo: Object.freeze({ name: "FLUSH-COMBO", label: "同じ枚数の FLUSH の数" }),
   penalty: Object.freeze({ name: "1-2-3", label: "減算" }),
 });
 
@@ -316,11 +331,18 @@ export const ROLE_GROWTH = Object.freeze({
 /** レベルを反映した倍率。levels は { 系統: レベル }（例：{ set: 2 }）。 */
 export function upgradedMultiplier(role, levels = {}) {
   if (role.kind !== "bonus") return role.multiplier;
+  // 「役の新計算（試作）」は式の底（基礎倍率）を上げるので、式から計算し直す。
+  if (role.graded) return gradedRoleMultiplier(role, levels, ROLE_GROWTH.UPGRADE_STEP);
   const level = levels[role.family] ?? 0;
   return Number((role.multiplier + level * ROLE_GROWTH.UPGRADE_STEP).toFixed(3));
 }
 
-/** 強化できる系統（ボーナス役を持つ系統）。「ダイスの色（試作）」では色の系統も加わる。 */
+/**
+ * 強化できる系統（ボーナス役を持つ系統）。「ダイスの色（試作）」では色の系統も加わる。
+ * 「役の新計算（試作）」の COMBO 系統は強化できない（upgradable: false）。
+ */
 export function upgradableFamiliesFor(ruleset = "standard") {
-  return roleFamiliesFor(ruleset).filter(({ roles }) => roles.some((role) => role.kind === "bonus"));
+  return roleFamiliesFor(ruleset).filter(({ roles }) =>
+    roles.some((role) => role.kind === "bonus" && role.upgradable !== false),
+  );
 }

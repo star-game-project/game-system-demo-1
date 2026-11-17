@@ -13,6 +13,7 @@ import {
   createDeckFromCounts,
 } from "./data/cards.js";
 import { ROLE_BY_ID, ROLE_FAMILY_INFO, ROLE_GROWTH, roleFamiliesFor, roleLabel, upgradedMultiplier } from "./data/roles.js";
+import { COMBO_FORMULAS, GRADED_FORMULAS } from "./data/gradedRoles.js";
 import {
   addCard,
   bucketLimit,
@@ -772,11 +773,23 @@ function renderRoleTable(levels = {}, rulesetId = ruleset) {
     ).join("");
     return `
       <div class="role-family ${risk ? "role-family--risk" : ""}">
-        <div class="role-family__head"><strong>${name}</strong><small>${label}${levels[family] ? ` · Lv${levels[family]}（全段階 +${Number((levels[family] * ROLE_GROWTH.UPGRADE_STEP).toFixed(2))}）` : ""}</small></div>
+        <div class="role-family__head"><strong>${name}</strong><small>${label}${levels[family] ? ` · Lv${levels[family]}（${upgradeNote(family, levels[family], rulesetId)}）` : ""}${COMBO_FORMULAS[family] ? ` · 強化できない（${ROLE_FAMILY_INFO[COMBO_FORMULAS[family].of].name} の強化が反映される）` : ""}</small></div>
         ${stages}
       </div>
     `;
   }).join("");
+}
+
+/**
+ * 系統をレベル level まで強化したときの上がり方。
+ * 「役の新計算（試作）」は式の底（基礎倍率）が上がり、それ以外は全段階の倍率に足す。
+ */
+function upgradeNote(family, level, rulesetId = ruleset) {
+  if (hasRule(rulesetId, "graded_roles") && GRADED_FORMULAS[family]) {
+    const { base } = GRADED_FORMULAS[family];
+    return `基礎倍率 ${base} → ${Number((base + level * ROLE_GROWTH.UPGRADE_STEP).toFixed(2))}`;
+  }
+  return `全段階 +${Number((level * ROLE_GROWTH.UPGRADE_STEP).toFixed(2))}`;
 }
 
 function roleRuleHint(rulesetId = ruleset) {
@@ -1026,7 +1039,11 @@ function renderReward() {
             <small>${range(runRoleLevels)} → ${range(next)} / 系統 ${label}</small>
           </div>
         </header>
-        <span class="ability ability--none">全段階の倍率 +${ROLE_GROWTH.UPGRADE_STEP}：${roles.map((role) => role.stage).join("・")}</span>
+        <span class="ability ability--none">${
+          hasRule(engine.state.ruleset, "graded_roles")
+            ? `${upgradeNote(id, level, engine.state.ruleset)} → ${upgradeNote(id, level + 1, engine.state.ruleset).split(" → ")[1]}（枚数が多い段階ほど伸びる）`
+            : `全段階の倍率 +${ROLE_GROWTH.UPGRADE_STEP}：${roles.map((role) => role.stage).join("・")}`
+        }</span>
         <button type="button" class="command-button command-button--secondary" data-reward-role="${id}">${selected ? "選択中（もう一度で解除）" : "この系統を強化"}</button>
       </article>
     `;
@@ -1073,7 +1090,7 @@ function renderReward() {
       </section>
 
       <section class="catalogue">
-        <div class="build-heading"><div><span class="eyebrow">ROLE UPGRADE</span><h2>役の強化（1系統まで・その系統の全段階に倍率 +${ROLE_GROWTH.UPGRADE_STEP}）</h2></div></div>
+        <div class="build-heading"><div><span class="eyebrow">ROLE UPGRADE</span><h2>役の強化（1系統まで・${hasRule(engine.state.ruleset, "graded_roles") ? `その系統の基礎倍率 +${ROLE_GROWTH.UPGRADE_STEP}` : `その系統の全段階に倍率 +${ROLE_GROWTH.UPGRADE_STEP}`}）</h2></div></div>
         <div class="catalogue-grid">${roleCards}</div>
       </section>
 

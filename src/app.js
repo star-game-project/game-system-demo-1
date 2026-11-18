@@ -92,6 +92,8 @@ let pendingTactical = null;
 // （戦術カードの対象選択を2回目のクリックで取り消さないために使う）。
 const DOUBLE_CLICK_MS = 400;
 let lastCardClick = { cardId: null, at: 0 };
+// 「選んで出す」で、ドラッグ中の場のカードの id。
+let draggingFieldCardId = null;
 // 連戦中のデッキ（カードごとの枚数）。構築画面のデッキから始まり、報酬で入手・削除して育つ。
 let runCounts = null;
 // 連戦中の役の強化レベル（{ 役id: レベル }）。報酬で上がり、1戦目からやり直すと消える。
@@ -279,7 +281,12 @@ function renderEnemies(state) {
   const panels = state.enemies.map((enemy) => {
     const defeated = enemy.hp <= 0;
     const targeted = !defeated && target?.id === enemy.id;
-    const tag = defeated ? "DEFEATED" : targeted ? "◎ TARGET" : "クリックで対象に";
+    const stacking = engine.isSelectPlay() && (state.selectedCardIds.length > 0 || state.selectedFieldCardId);
+    const tag = defeated
+      ? "DEFEATED"
+      : stacking
+        ? state.selectedCardIds.length ? "クリックで場にスタック" : "クリックで攻撃対象に変更"
+        : targeted ? "◎ TARGET" : "クリックで対象に";
     return `
       <div class="enemy-slot ${targeted ? "is-target" : ""} ${defeated ? "is-defeated" : ""}"
         ${defeated ? "" : `data-target-id="${enemy.id}" role="button" tabindex="0"`}
@@ -374,12 +381,16 @@ function renderField(state) {
   const targetName = (entry) =>
     entry.targetId === "all" ? "全体" : state.enemies.find((enemy) => enemy.id === entry.targetId)?.name ?? "—";
   // 役は場のカードの目（と色）で決まるので、出したカードごとに目と色を見せる。
-  const rows = field.results.map((entry) => {
+  const rows = field.results.map((entry, index) => {
     const { card } = entry;
     const wild = isWildCard(card);
+    const chosen = state.selectedFieldCardId === card.id;
     return `
-    <li class="field-card die-${card.dieValue} ${card.color ? `dice-accent--${card.color}` : ""}"
-      aria-label="${card.name}、目${wild ? "ワイルド" : card.dieValue}${card.color ? `、${DICE_COLOR_BY_ID[card.color].label}` : ""}">
+    <li class="field-card die-${card.dieValue} ${card.color ? `dice-accent--${card.color}` : ""} ${chosen ? "is-selected" : ""}"
+      data-field-card-id="${card.id}" draggable="true" tabindex="0" role="button" aria-pressed="${chosen}"
+      title="ドラッグで使用順を変更 / クリックして敵を押すと攻撃対象を変更"
+      aria-label="${index + 1}番目、${card.name}、目${wild ? "ワイルド" : card.dieValue}${card.color ? `、${DICE_COLOR_BY_ID[card.color].label}` : ""}">
+      <span class="field-card__order">${index + 1}</span>
       <span class="field-card__die" aria-hidden="true">${wild ? "◈" : DIE_FACES[card.dieValue]}</span>
       <strong>${card.name} ${colorChip(card.color)}</strong>
       <small>${isDefenseCard(card) ? `DEF ${card.defense}` : `ATK ${entry.attack} → ${targetName(entry)}`}</small>
@@ -525,7 +536,8 @@ function renderHand(state) {
       const tactical = isTacticalCard(card);
       const defense = isDefenseCard(card);
       const preview = tactical || defense ? null : engine.getAttackPreview(card.id);
-      const selected = card.id === state.selectedCardId;
+      const order = state.selectedCardIds.indexOf(card.id) + 1;
+      const selected = engine.isSelectPlay() ? order > 0 : card.id === state.selectedCardId;
       const unaffordable = card.cost > state.player.point;
       const isSource = targeting && card.id === pendingTactical.cardId;
       const isTarget = targeting && pendingTactical.targets.includes(card.id);
@@ -563,6 +575,7 @@ function renderHand(state) {
           <span class="battle-card__edge"></span>
           <span class="battle-card__cost"><small>COST</small>${card.cost}</span>
           <span class="battle-card__index">${String(index + 1).padStart(2, "0")}</span>
+          ${order ? `<span class="battle-card__order" aria-label="${order}番目に選択">${order}</span>` : ""}
           <span class="battle-card__die" aria-hidden="true">${isWildCard(card) ? "◈" : DIE_FACES[card.dieValue]}</span>
           ${colorChip(card.color)}
           ${tuned ? `<span class="tuned-flag">TUNED ${card.baseDieValue}→${card.dieValue}</span>` : ""}
@@ -627,22 +640,37 @@ function renderCommands(state) {
   if (state.phase === PHASES.CARD_SELECT) {
     const canAttack = engine.hasPlayableAttackCard();
     const defending = isDefenseCard(selected);
+    const fieldRule = engine.isSelectPlay();
+    if (fieldRule) {
+      const count = state.selectedCardIds.length;
+      const fieldCard = state.playedCards.find((entry) => entry.card.id === state.selectedFieldCardId)?.card;
+      const headline = count
+        ? `${count}枚を選択中：敵を押すと場にスタック`
+        : fieldCard
+          ? `${fieldCard.name}（場）：敵を押すと攻撃対象を変更`
+          : canAttack ? "場に出すカードを選択" : "使えるカードがありません";
+      const detail = count
+        ? "カードの数字は選んだ順（スタックされる順）です。もう一度押すと選択を外します"
+        : "カードを押して複数選び、敵を押すとまとめて場に積みます。場のカードはドラッグで使用順を変更、クリックしてから敵を押すと攻撃対象を変更。終わったら END TURN";
+      return `
+      <div class="command-copy">
+        <span class="command-step">01 / 01</span>
+        <div><strong>${headline}</strong><small>${detail}</small></div>
+      </div>
+      <div class="command-actions">
+        <button class="command-button command-button--danger" data-action="end-turn">END TURN</button>
+      </div>
+    `;
+    }
     const headline = selected
-      ? engine.isSelectPlay()
-        ? `${selected.name} を場に出す${defending ? "（防御）" : ""}`
-        : `${selected.name} で${defending ? "防御" : "攻撃"}`
+      ? `${selected.name} で${defending ? "防御" : "攻撃"}`
       : canAttack
         ? "使用するカードを選択"
         : "使えるカードがありません";
-    const fieldRule = engine.isSelectPlay();
     const howTo = selected
-      ? `${selected.name} をもう一度押すと${fieldRule ? "場に出す" : "使う"}`
-      : `カードを押して選び、もう一度押すと${fieldRule ? "場に出す" : "使う"}（ダブルクリックでも可）`;
-    const detail = `${howTo} — ${fieldRule
-      ? selected
-        ? "処理はターン終了時で、場のカード全体の役の倍率が掛かります"
-        : "ポイントが続く限り何枚でも場に出せます。END TURN で場のカードをまとめて処理します"
-      : selected
+      ? `${selected.name} をもう一度押すと使う`
+      : "カードを押して選び、もう一度押すと使う（ダブルクリックでも可）";
+    const detail = `${howTo} — ${selected
         ? defending
           ? `シールド +${selected.defense}（役の倍率は掛かりません）`
           : "使用前の手札で役を判定します"
@@ -1299,6 +1327,12 @@ function handleCardClick(cardId) {
     return;
   }
 
+  // 「選んで出す」：クリックで選択／解除（複数選べる）。場に積むのは敵をクリックしたとき。
+  if (engine.isSelectPlay()) {
+    if (engine.selectCard(cardId)) render();
+    return;
+  }
+
   // 攻撃・防御カード：1回目で選び、選んであるカードをもう一度押すと使う（ダブルクリックでも、間を空けても）。
   if (state.selectedCardId === cardId) {
     if (engine.useSelectedCard()) {
@@ -1437,11 +1471,67 @@ function bindEvents() {
 
   app.querySelectorAll("[data-target-id]").forEach((slot) => {
     const select = () => {
-      if (engine.setTarget(slot.dataset.targetId)) render();
+      const id = slot.dataset.targetId;
+      if (engine.isSelectPlay() && engine.state.phase === PHASES.CARD_SELECT) {
+        // 選んだ手札があれば場にスタック。場のカードを選んでいれば、その攻撃対象を変更。
+        if (engine.state.selectedCardIds.length) {
+          if (engine.stackSelected(id)) {
+            cancelTargeting();
+            render();
+          }
+          return;
+        }
+        if (engine.state.selectedFieldCardId) {
+          if (engine.retargetFieldCard(id)) render();
+          return;
+        }
+      }
+      if (engine.setTarget(id)) render();
     };
     slot.addEventListener("click", select);
     slot.addEventListener("keydown", (event) => {
       if (event.key === "Enter" || event.key === " ") select();
+    });
+  });
+
+  // 場のカード：クリックで選択（対象変更用）、ドラッグ&ドロップで使用順を変更。
+  app.querySelectorAll("[data-field-card-id]").forEach((item) => {
+    const cardId = item.dataset.fieldCardId;
+    const clickSelect = () => {
+      if (engine.selectFieldCard(cardId)) render();
+    };
+    item.addEventListener("click", clickSelect);
+    item.addEventListener("keydown", (event) => {
+      if (event.key === "Enter" || event.key === " ") {
+        event.preventDefault();
+        clickSelect();
+      }
+    });
+    item.addEventListener("dragstart", (event) => {
+      draggingFieldCardId = cardId;
+      event.dataTransfer.effectAllowed = "move";
+      event.dataTransfer.setData("text/plain", cardId);
+      item.classList.add("is-dragging");
+    });
+    item.addEventListener("dragend", () => {
+      draggingFieldCardId = null;
+      item.classList.remove("is-dragging");
+      app.querySelectorAll(".field-card.is-drop-target").forEach((el) => el.classList.remove("is-drop-target"));
+    });
+    item.addEventListener("dragover", (event) => {
+      if (!draggingFieldCardId || draggingFieldCardId === cardId) return;
+      event.preventDefault();
+      event.dataTransfer.dropEffect = "move";
+      item.classList.add("is-drop-target");
+    });
+    item.addEventListener("dragleave", () => item.classList.remove("is-drop-target"));
+    item.addEventListener("drop", (event) => {
+      event.preventDefault();
+      const dragged = draggingFieldCardId;
+      draggingFieldCardId = null;
+      if (!dragged || dragged === cardId) return;
+      const toIndex = engine.state.playedCards.findIndex((entry) => entry.card.id === cardId);
+      if (engine.moveFieldCard(dragged, toIndex)) render();
     });
   });
 

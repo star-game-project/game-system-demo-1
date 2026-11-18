@@ -1967,6 +1967,12 @@ a:focus-visible {
 .field-card.dice-accent--yellow { --card-accent: #ffd34d; }
 .field-card.dice-accent--purple { --card-accent: #c48bff; }
 .field-card.dice-accent--orange { --card-accent: #ff9b4a; }
+.field-card { position: relative; cursor: grab; }
+.field-card__order { position: absolute; top: -8px; left: -8px; min-width: 18px; height: 18px; padding: 0 4px; border-radius: 9px; background: var(--cyan); color: #04121a; font-size: 11px; font-weight: 700; line-height: 18px; text-align: center; }
+.field-card.is-selected { outline: 2px solid var(--cyan); }
+.field-card.is-dragging { opacity: 0.4; }
+.field-card.is-drop-target { outline: 2px dashed var(--cyan); }
+.battle-card__order { position: absolute; top: 10px; left: 50%; transform: translateX(-50%); z-index: 3; min-width: 24px; height: 24px; border-radius: 12px; background: var(--cyan); color: #04121a; font-size: 14px; font-weight: 700; line-height: 24px; text-align: center; box-shadow: 0 0 8px rgba(0, 220, 255, 0.6); }
 
 .ruleset-picker__hand-size { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 10px; font-size: 12px; color: var(--muted); }
 /* 見出しの幅をそろえ、ボタンの位置が行ごと・選択ごとに動かないようにする（変わる説明は右側に置く）。 */

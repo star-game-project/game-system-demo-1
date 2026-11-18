@@ -72,6 +72,9 @@ export function createInitialGameState(
     // 攻撃の対象。倒れたら生き残っている先頭の敵に移る。
     targetId: "enemy_1",
     selectedCardId: null,
+    // 「選んで出す（試作）」：選択中の手札（選んだ順）と、選択中の場のカード（対象変更用）。
+    selectedCardIds: [],
+    selectedFieldCardId: null,
     // 「選んで出す（試作）」で、このターンに場に出したカード（{ card, targetId, attack }、出した順）。
     // ターン終了時にまとめて処理する。役はこのカードだけで判定する。
     playedCards: [],

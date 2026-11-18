@@ -205,3 +205,71 @@ test("the hand size is chosen on the build screen, six or seven, and only for th
   assert.equal(createInitialGameState(() => 0.5, null, { ruleset: "select_play", handSize: 9 }).handSize, 6, "only 6 or 7");
   assert.equal(createInitialGameState(() => 0.5, null, { handSize: 7 }).player.hand.length, 5, "the current rules keep five");
 });
+
+// ---- 複数選択・スタック・並べ替え・対象変更 ----
+
+test("several cards can be selected at once, in click order, and clicking again deselects", () => {
+  const engine = fieldEngine([card("a", 1), card("b", 2), card("c", 3)]);
+  assert.ok(engine.selectCard("b"));
+  assert.ok(engine.selectCard("a"));
+  assert.ok(engine.selectCard("c"));
+  assert.deepEqual(engine.state.selectedCardIds, ["b", "a", "c"]);
+  assert.ok(engine.selectCard("a"));
+  assert.deepEqual(engine.state.selectedCardIds, ["b", "c"]);
+});
+
+test("clicking an enemy stacks the selected cards onto the field in the order they were selected", () => {
+  const engine = fieldEngine([card("a", 1), card("b", 2), card("c", 3)]);
+  ["c", "a"].forEach((id) => engine.selectCard(id));
+  assert.ok(engine.stackSelected("enemy_2"));
+  assert.deepEqual(engine.getPlayedCards().map((c) => c.id), ["c", "a"]);
+  assert.deepEqual(engine.state.playedCards.map((e) => e.targetId), ["enemy_2", "enemy_2"]);
+  assert.deepEqual(engine.state.player.hand.map((c) => c.id), ["b"]);
+  assert.equal(engine.state.player.point, 8);
+  assert.deepEqual(engine.state.selectedCardIds, []);
+});
+
+test("the total cost of the selection cannot exceed the points left", () => {
+  const engine = fieldEngine([card("a", 4, { cost: 3 }), card("b", 4, { cost: 3 })], { point: 5 });
+  assert.ok(engine.selectCard("a"));
+  assert.equal(engine.selectCard("b"), false);
+});
+
+test("stacked cards can be reordered, which changes the order they resolve in", () => {
+  const engine = fieldEngine([card("a", 1, { attack: 60 }), card("b", 2, { attack: 10 })]);
+  engine.selectCard("a");
+  engine.selectCard("b");
+  engine.stackSelected("enemy_1");
+  assert.ok(engine.moveFieldCard("b", 0));
+  assert.deepEqual(engine.getPlayedCards().map((c) => c.id), ["b", "a"]);
+  assert.equal(engine.moveFieldCard("b", 0), false, "no change, nothing to do");
+});
+
+test("a stacked attack can be given a new target by selecting it and then an enemy", () => {
+  const engine = fieldEngine([card("a", 1, { attack: 10 }), card("d", 2, { attack: 0, defense: 10 })]);
+  engine.selectCard("a");
+  engine.selectCard("d");
+  engine.stackSelected("enemy_1");
+
+  assert.ok(engine.selectFieldCard("a"));
+  assert.ok(engine.retargetFieldCard("enemy_2"));
+  assert.equal(engine.state.playedCards[0].targetId, "enemy_2");
+
+  // 防御カードの対象は変えられない。
+  assert.ok(engine.selectFieldCard("d"));
+  assert.equal(engine.retargetFieldCard("enemy_1"), false);
+  engine.endTurn();
+  assert.equal(engine.state.enemies[1].hp, 50 - 10);
+  assert.equal(engine.state.enemies[0].hp, 50);
+});
+
+test("selecting a field card drops the hand selection, and the other way round", () => {
+  const engine = fieldEngine([card("a", 1), card("b", 2)]);
+  engine.selectCard("a");
+  engine.stackSelected("enemy_1");
+  engine.selectCard("b");
+  assert.ok(engine.selectFieldCard("a"));
+  assert.deepEqual(engine.state.selectedCardIds, []);
+  engine.selectCard("b");
+  assert.equal(engine.state.selectedFieldCardId, null);
+});

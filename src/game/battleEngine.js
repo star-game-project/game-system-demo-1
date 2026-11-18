@@ -60,30 +60,120 @@ export class BattleEngine {
     return card.attack + getPassiveBonus(card, player.hand) + getTemporaryBonus(player.temporaryEffects, this.state.turn);
   }
 
-  /** カードを場に出す。ポイントはその場で払い、処理（ダメージ・シールド）はターン終了時に行う。 */
-  playToField(card) {
-    const { player } = this.state;
-    const defense = isDefenseCard(card);
-    const target = defense || isAreaAttackCard(card) ? null : this.getTargetEnemy();
-    const entry = {
-      card,
-      targetId: defense ? null : isAreaAttackCard(card) ? "all" : target?.id ?? null,
-      attack: defense ? 0 : this.adjustedAttack(card),
-    };
-
-    player.point = Math.max(0, player.point - card.cost);
-    player.temporaryEffects.push(...createTemporaryEffects(card, this.state.turn));
-    player.hand = player.hand.filter((item) => item.id !== card.id);
-    player.cardsPlayed += 1;
-    this.state.playedCards = [...this.state.playedCards, entry];
-    this.state.turnTotals.cards += 1;
+  /** 選択をすべて解除する（手札の選択・場のカードの選択）。 */
+  clearSelection() {
     this.state.selectedCardId = null;
+    this.state.selectedCardIds = [];
+    this.state.selectedFieldCardId = null;
+  }
+
+  /** 選択中の手札のカード（選んだ順）。 */
+  getSelectedCards() {
+    const { hand } = this.state.player;
+    return (this.state.selectedCardIds ?? []).map((id) => hand.find((card) => card.id === id)).filter(Boolean);
+  }
+
+  /** 手札の選択を整える：手札にないカードを外し、ポイントを超える分は後ろから外す。 */
+  pruneSelection() {
+    let cost = 0;
+    const kept = [];
+    for (const card of this.getSelectedCards()) {
+      if (cost + card.cost > this.state.player.point) break;
+      cost += card.cost;
+      kept.push(card.id);
+    }
+    this.state.selectedCardIds = kept;
+    this.state.selectedCardId = kept[kept.length - 1] ?? null;
+  }
+
+  /**
+   * 選択中のカードを、選んだ順に場へスタックする。ポイントはここで払い、処理はターン終了時。
+   * 単体攻撃は enemyId の敵を対象にする（防御・全体攻撃は対象を取らない）。
+   */
+  stackSelected(enemyId) {
+    if (!this.isSelectPlay() || this.state.phase !== PHASES.CARD_SELECT) return null;
+    const { player } = this.state;
+    const cards = this.getSelectedCards();
+    if (!cards.length) return null;
+    const target = this.state.enemies.find((enemy) => enemy.id === enemyId && enemy.hp > 0) ?? null;
+    if (!target && cards.some((card) => !isDefenseCard(card) && !isAreaAttackCard(card))) return null;
+    if (cards.reduce((sum, card) => sum + card.cost, 0) > player.point) return null;
+
+    // 攻撃力は手札が減る前に決める（隣のカードの常在能力は、まとめて出す前の手札で数える）。
+    const entries = cards.map((card) => {
+      const defense = isDefenseCard(card);
+      return {
+        card,
+        targetId: defense ? null : isAreaAttackCard(card) ? "all" : target.id,
+        attack: defense ? 0 : this.adjustedAttack(card),
+      };
+    });
+    const ids = new Set(cards.map((card) => card.id));
+    for (const card of cards) {
+      player.point = Math.max(0, player.point - card.cost);
+      player.temporaryEffects.push(...createTemporaryEffects(card, this.state.turn));
+      player.cardsPlayed += 1;
+    }
+    player.hand = player.hand.filter((item) => !ids.has(item.id));
+    this.state.playedCards = [...this.state.playedCards, ...entries];
+    this.state.turnTotals.cards += cards.length;
+    if (target) this.state.targetId = target.id;
+    this.clearSelection();
     this.state.currentRole = this.evaluateRole();
 
-    const where = defense ? "（防御）" : entry.targetId === "all" ? "（全体）" : `（${target?.name ?? "—"}へ）`;
     const role = this.state.currentRole;
-    this.state.battleMessage = `${card.name} を場に出した${where}。処理はターン終了時。いまの役：${role.roleName ? `${role.roles.map((r) => (r.stage ? `${r.name}（${r.stage}）` : r.name)).join(" × ")} ×${role.multiplier}` : "なし"}`;
-    return entry;
+    const roleText = role.roleName
+      ? `${role.roles.map((r) => (r.stage ? `${r.name}（${r.stage}）` : r.name)).join(" × ")} ×${role.multiplier}`
+      : "なし";
+    this.state.battleMessage = `${cards.map((card) => card.name).join("・")} を場にスタックした${target ? `（${target.name}へ）` : ""}。処理はターン終了時。いまの役：${roleText}`;
+    return entries;
+  }
+
+  /** 場のカードを選ぶ（もう一度押すと解除）。選ぶと、手札の選択は外れる。 */
+  selectFieldCard(cardId) {
+    if (!this.isSelectPlay() || this.state.phase !== PHASES.CARD_SELECT) return false;
+    const entry = this.state.playedCards.find((item) => item.card.id === cardId);
+    if (!entry) return false;
+    if (this.state.selectedFieldCardId === cardId) {
+      this.state.selectedFieldCardId = null;
+      return true;
+    }
+    this.clearSelection();
+    this.state.selectedFieldCardId = cardId;
+    this.state.battleMessage = isDefenseCard(entry.card) || entry.targetId === "all"
+      ? `${entry.card.name} は攻撃対象を変えられません。ドラッグで使用順を変えられます。`
+      : `${entry.card.name} を選択中。敵を押すと攻撃対象を変えます。`;
+    return true;
+  }
+
+  /** 選んでいる場のカードの攻撃対象を変える。単体攻撃だけ。 */
+  retargetFieldCard(enemyId) {
+    if (!this.isSelectPlay() || this.state.phase !== PHASES.CARD_SELECT) return false;
+    const enemy = this.state.enemies.find((item) => item.id === enemyId && item.hp > 0);
+    const index = this.state.playedCards.findIndex((entry) => entry.card.id === this.state.selectedFieldCardId);
+    if (!enemy || index < 0) return false;
+    const entry = this.state.playedCards[index];
+    if (isDefenseCard(entry.card) || entry.targetId === "all") return false;
+    this.state.playedCards = this.state.playedCards.map((item, i) => (i === index ? { ...item, targetId: enemy.id } : item));
+    this.state.targetId = enemy.id;
+    this.state.selectedFieldCardId = null;
+    this.state.battleMessage = `${entry.card.name} の攻撃対象を ${enemy.name} に変更しました。`;
+    return true;
+  }
+
+  /** 場のカードを使用順の toIndex 番目へ動かす（0始まり）。 */
+  moveFieldCard(cardId, toIndex) {
+    if (!this.isSelectPlay() || this.state.phase !== PHASES.CARD_SELECT) return false;
+    const entries = [...this.state.playedCards];
+    const from = entries.findIndex((entry) => entry.card.id === cardId);
+    if (from < 0) return false;
+    const to = Math.max(0, Math.min(entries.length - 1, toIndex));
+    if (to === from) return false;
+    const [moved] = entries.splice(from, 1);
+    entries.splice(to, 0, moved);
+    this.state.playedCards = entries;
+    this.state.battleMessage = `${moved.card.name} の使用順を ${to + 1} 番目にしました。`;
+    return true;
   }
 
   /**
@@ -91,9 +181,9 @@ export class BattleEngine {
    * extra を渡すと、そのカードも場に出したと仮定して計算する（選んでいるカードの見込み）。
    * 攻撃は出した順に、出したときに選んだ対象へ当てる。対象が先に倒れていたら、生き残っている先頭の敵へ。
    */
-  resolveField(commit = false, extra = null) {
+  resolveField(commit = false, extras = []) {
     const entries = [...this.state.playedCards];
-    if (extra) {
+    for (const extra of extras) {
       const defense = isDefenseCard(extra);
       entries.push({
         card: extra,
@@ -137,10 +227,16 @@ export class BattleEngine {
     };
   }
 
-  /** 場の見込み（いまターンを終えたらどうなるか）。cardId を渡すと、そのカードも出した場合。 */
+  /**
+   * 場の見込み（いまターンを終えたらどうなるか）。cardId を渡すと、選択中のカードを選んだ順に
+   * すべて出した場合（cardId が選択中になければ、そのカードも最後に足す）。
+   */
   getFieldPreview(cardId = null) {
-    const extra = cardId ? this.state.player.hand.find((card) => card.id === cardId) ?? null : null;
-    return this.resolveField(false, extra && !isTacticalCard(extra) ? extra : null);
+    if (!cardId) return this.resolveField(false);
+    const cards = this.getSelectedCards();
+    const card = this.state.player.hand.find((item) => item.id === cardId);
+    if (card && !cards.some((item) => item.id === cardId)) cards.push(card);
+    return this.resolveField(false, cards.filter((item) => !isTacticalCard(item)));
   }
 
   /** ターン終了時に場のカードをまとめて処理し、捨て札へ送る。 */
@@ -237,11 +333,27 @@ export class BattleEngine {
     const card = this.state.player.hand.find((item) => item.id === cardId);
     if (!card || isTacticalCard(card)) return false;
     if (card.cost > this.state.player.point) return false;
-    this.state.selectedCardId = card.id;
     if (this.isSelectPlay()) {
-      this.state.battleMessage = `${card.name} を選択中。場に出すと、ターン終了時に場のカード全体の役の倍率で処理します。`;
+      // 複数枚を同時に選べる（選んだ順がそのまま場に積む順）。選んであるカードをもう一度押すと外す。
+      const ids = this.state.selectedCardIds ?? [];
+      if (ids.includes(card.id)) {
+        this.state.selectedCardIds = ids.filter((id) => id !== card.id);
+      } else {
+        const cost = this.getSelectedCards().reduce((sum, item) => sum + item.cost, 0);
+        if (cost + card.cost > this.state.player.point) {
+          this.state.battleMessage = "ポイントが足りないため、これ以上は選べません。";
+          return false;
+        }
+        this.state.selectedCardIds = [...ids, card.id];
+      }
+      this.state.selectedFieldCardId = null;
+      this.state.selectedCardId = this.state.selectedCardIds[this.state.selectedCardIds.length - 1] ?? null;
+      this.state.battleMessage = this.state.selectedCardIds.length
+        ? `${this.state.selectedCardIds.length}枚を選択中。敵を押すと、選んだ順に場へスタックします。`
+        : "選択を解除しました。";
       return true;
     }
+    this.state.selectedCardId = card.id;
     this.state.battleMessage = isDefenseCard(card)
       ? `${card.name} を選択中。シールド +${card.defense} を得ます（役の倍率は掛かりません）。`
       : `${card.name} を選択中。攻撃内容を確認してください。`;
@@ -276,7 +388,7 @@ export class BattleEngine {
    */
   getFieldCardPreview(card) {
     const field = this.getFieldPreview(card.id);
-    const result = field.results[field.results.length - 1];
+    const result = field.results.find((item) => item.card.id === card.id);
     const attack = this.adjustedAttack(card);
     return {
       baseAttack: card.attack,
@@ -379,8 +491,10 @@ export class BattleEngine {
 
     const message = this.resolveTacticalAbility(card, targets);
 
-    if (!player.hand.some((item) => item.id === this.state.selectedCardId)) {
-      this.state.selectedCardId = null;
+    if (this.isSelectPlay()) {
+      this.pruneSelection();
+    } else if (!player.hand.some((item) => item.id === this.state.selectedCardId)) {
+      this.clearSelection();
     }
     this.state.currentRole = this.evaluateRole(player.hand);
     this.state.battleMessage = message;
@@ -434,7 +548,7 @@ export class BattleEngine {
     const card = this.getSelectedCard();
     if (!card || isTacticalCard(card)) return null;
     if (card.cost > this.state.player.point) return null;
-    if (this.isSelectPlay()) return this.playToField(card);
+    if (this.isSelectPlay()) return this.stackSelected(this.getTargetEnemy()?.id ?? null);
     if (isDefenseCard(card)) return this.defendWith(card);
 
     const attack = calculateAttack(
@@ -468,7 +582,7 @@ export class BattleEngine {
     this.state.turnTotals.cards += 1;
     this.state.turnTotals.dealt += dealt;
     this.state.turnTotals.blocked += blocked;
-    this.state.selectedCardId = null;
+    this.clearSelection();
 
     const scope = isAreaAttackCard(card) ? "全体" : hits[0].enemyName;
     this.state.battleMessage = `${card.name} → ${scope} — ${hits.map(hitText).join(" / ")}`;
@@ -501,7 +615,7 @@ export class BattleEngine {
     this.state.lastDefense = defense;
     this.state.turnTotals.cards += 1;
     this.state.turnTotals.shield += card.defense;
-    this.state.selectedCardId = null;
+    this.clearSelection();
 
     this.state.battleMessage = `${card.name} — シールド +${card.defense}（現在 ${player.shield}）。`;
     return defense;
@@ -581,7 +695,7 @@ export class BattleEngine {
     const discarded = this.discardHand();
     const refill = this.drawIntoHand(this.state.handSize ?? GAME_CONFIG.START_HAND_SIZE);
 
-    this.state.selectedCardId = null;
+    this.clearSelection();
     this.state.currentRole = this.evaluateRole();
     this.state.phase = turnStartPhase(this.state.ruleset);
     const recycleNote = refill.recycleCount
@@ -639,7 +753,7 @@ export class BattleEngine {
     this.state.enemies.forEach((enemy) => {
       enemy.hp = 0;
     });
-    this.state.selectedCardId = null;
+    this.clearSelection();
     this.state.phase = PHASES.VICTORY;
     this.state.battleMessage = "戦闘をスキップしました（デモ用）。";
     return true;
@@ -648,7 +762,7 @@ export class BattleEngine {
   /** カードを使い終えたらプレイヤーが自分でターンを終了する。いつでも終了できる。 */
   endTurn() {
     if (this.state.phase !== PHASES.CARD_SELECT) return false;
-    this.state.selectedCardId = null;
+    this.clearSelection();
     // 「選んで出す（試作）」では、ここで場のカードをまとめて処理する。
     const resolved = this.isSelectPlay() ? this.resolvePlayedCards() : null;
     if (!aliveEnemies(this.state.enemies).length) {
